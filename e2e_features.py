@@ -908,6 +908,23 @@ ok("后台「显示『每日鸡汤』」checkbox label 同步",
    "显示「每日鸡汤」" in _settings_html)
 
 
+# ---------------- 16. flash 消息位置：顶部居中（不再右上角遮挡按钮） ----------------
+_css = open("static/css/admin.css", encoding="utf-8").read()
+# 找到 .flash-msg 块（包含 success 行之前的一段）
+import re as _re
+_flash_block = _re.search(r"\.flash-msg\s*\{[^}]+\}", _css)
+ok("admin.css .flash-msg 块存在", _flash_block is not None)
+ok("admin.css .flash-msg 改用 left: 50% + translateX(-50%) 顶部居中",
+   _flash_block and "left: 50%" in _flash_block.group()
+   and "translateX(-50%)" in _flash_block.group())
+ok("admin.css .flash-msg 已移除 right: 26px（避免右上角遮挡）",
+   "right: 26px" not in _css)
+ok("admin.css .flash-msg z-index 提到 100（高于按钮 / 低于 modal）",
+   _flash_block and "z-index: 100" in _flash_block.group())
+ok("admin.css .flash-msg 含滑入动画（wb-flash-in）",
+   "wb-flash-in" in _css)
+
+
 # ---- 收尾 ----
 print()
 if failures:

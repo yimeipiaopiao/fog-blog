@@ -13,6 +13,9 @@ const CDP_PORT = 9340;
 
 const TARGETS = [
   { p: "/", name: "v11_sidebar_after_rename", admin: false, splash: false, fullPage: true },
+  // 注入 fake flash 元素模拟"文章已保存"flash 弹出 —— 验证顶部居中位置
+  { p: "A:/admin/posts", name: "v11_flash_top_center", admin: true, splash: false,
+    actions: ["injectFlash"] },
 ];
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
@@ -224,6 +227,24 @@ async function main() {
         returnByValue: true,
       });
       await sleep(500);
+    }
+    if (t.actions && t.actions.includes("injectFlash")) {
+      await sleep(300);
+      await call("Runtime.evaluate", {
+        expression: `
+          (function () {
+            var d = document.createElement('div');
+            d.className = 'flash-msg success';
+            d.textContent = '已将 1 篇文章移入回收站';
+            d.setAttribute('data-auto-hide', '');
+            // 不放进 .main —— 直接 fixed 在 viewport
+            document.body.appendChild(d);
+            return 'injected';
+          })();
+        `,
+        returnByValue: true,
+      });
+      await sleep(400);
     }
 
     // 6) 等 css 应用
