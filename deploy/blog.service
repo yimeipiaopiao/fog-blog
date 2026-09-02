@@ -28,7 +28,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/www/blog/uploads /var/www/blog/backup
+# SQLite 数据库在项目根 /var/www/blog/blog.db，加上 uploads/backup 都需可写
+ReadWritePaths=/var/www/blog /var/www/blog/uploads /var/www/blog/backup
 
 [Install]
 WantedBy=multi-user.target
