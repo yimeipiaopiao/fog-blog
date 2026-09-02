@@ -896,6 +896,18 @@ ok("/admin/files data-del 走 wbModalSkip 守卫逻辑",
    "__wbModalSkip" in _files_html)
 
 
+# ---------------- 15. sidebar 文案：每日鸡汤 / 人生倒计时 ----------------
+ok("前台 sidebar 已改名为「每日鸡汤」（取代「每日一句」）",
+   "每日鸡汤" in html and "每日一句" not in html)
+ok("前台 sidebar 已改名为「人生倒计时」（取代「时间提醒」）",
+   "人生倒计时" in html and "时间提醒" not in html)
+_settings_html = ca.get("/admin/settings").get_data(as_text=True)
+ok("后台站点设置 h2 也同步改为「每日鸡汤（侧栏金句）」",
+   "每日鸡汤（侧栏金句）" in _settings_html)
+ok("后台「显示『每日鸡汤』」checkbox label 同步",
+   "显示「每日鸡汤」" in _settings_html)
+
+
 # ---- 收尾 ----
 print()
 if failures:
