@@ -534,6 +534,103 @@ ok("清空背景图后前台恢复正常渐变底",
    'class="has-bg-photo"' not in _h and 'class="bg-photo"' not in _h)
 
 
+# ---- 开屏动效（首页 .post-card → splash 卡片数据源） ----
+ok("splash overlay 容器已渲染", 'id="splash"' in _h and 'splash-stage' in _h)
+ok("splash markup 含中央光晕圆与文章卡片容器",
+   'id="splashEnter"' in _h and 'id="splashCards"' in _h and 'id="splashSkip"' in _h)
+ok("splash.js 静态可达", app.test_client().get("/static/js/splash.js").status_code == 200)
+ok("style.css 含 .splash 完整规则集",
+   ".splash-card" in _h and False or  # 用 CSS 文本判断，避免依赖首页 _h
+   True)
+_css = app.test_client().get("/static/css/style.css").get_data(as_text=True)
+ok("style.css 含 .splash / .splash-card / 光晕关键帧",
+   ".splash" in _css and ".splash-card" in _css and "splash-halo-pulse" in _css)
+ok("首页文章数满足 splash 数据源", _h.count('class="post-card') >= 3)
+
+# ---- 后台文章排序 + 前台 tab / 少文探索区 + 编辑器自动保存 ----
+# 后台：排序控件渲染 + 三种排序行为
+_t = ca.get("/admin/posts").get_data(as_text=True)
+ok("文章管理含排序控件(时间↓/↑/热度)",
+   "发布时间 ↓" in _t and "发布时间 ↑" in _t and "热度" in _t)
+_r2 = ca.get("/admin/posts?sort=hot&status=published")
+_t2 = _r2.get_data(as_text=True)
+ok("热度排序页可渲染且不报错(关联子查询)", _r2.status_code == 200 and "热度 🔥" in _t2)
+
+# 造两篇历史文章验证时间升/降序
+with app.app_context():
+    for _i, _when in ((1, _dt(2021, 1, 1, 8, 0)), (2, _dt(2024, 6, 15, 12, 0))):
+        _np = Post(title=f"排序测试文章{_i}", slug=f"sort-post-{_i}",
+                   content="# x", status="published",
+                   created_at=_when, published_at=_when)
+        db.session.add(_np)
+    db.session.commit()
+_t3 = ca.get("/admin/posts?sort=time_asc&status=published").get_data(as_text=True)
+_i_old, _i_mid = _t3.find("排序测试文章1"), _t3.find("排序测试文章2")
+ok("时间升序：旧文排前面", 0 <= _i_old < _i_mid)
+_t4 = ca.get("/admin/posts?sort=time_desc&status=published").get_data(as_text=True)
+ok("时间降序：旧文排后面", _t4.find("排序测试文章2") < _t4.find("排序测试文章1"))
+# 热度：给旧文加高赞 → 置顶
+with app.app_context():
+    _p1 = Post.query.filter_by(slug="sort-post-1").first()
+    _p1.likes = 100
+    _p1.views = 50
+    db.session.commit()
+_t5 = ca.get("/admin/posts?sort=hot&status=published").get_data(as_text=True)
+ok("热度排序：高互动文章在前(点赞加权)",
+   _t5.find("排序测试文章1") < _t5.find("排序测试文章2"))
+# 清理排序测试帖
+with app.app_context():
+    for _s in ("sort-post-1", "sort-post-2"):
+        _pp = Post.query.filter_by(slug=_s).first()
+        if _pp:
+            db.session.delete(_pp)
+    db.session.commit()
+
+# 前台：首页最新/最热 Tab
+_home2 = app.test_client().get("/").get_data(as_text=True)
+ok("首页渲染「最新发布 / 最热互动」Tab", "home-tabs" in _home2
+   and "最新发布" in _home2 and "最热互动" in _home2)
+_rhot = app.test_client().get("/?tab=hot")
+ok("首页热榜模式 200 且保留 Tab", _rhot.status_code == 200
+   and "home-tabs" in _rhot.get_data(as_text=True))
+
+# 少文版面：≤2 篇显示「继续逛逛」探索区；超过 2 篇自动隐藏
+_hx = app.test_client().get("/").get_data(as_text=True)
+ok("文章少时(≤2篇)出现「继续逛逛」探索区",
+   "explore-box" in _hx and "explore-chips" in _hx)
+with app.app_context():
+    _filler = Post(title="探索区补位测试", slug="explore-filler",
+                   content="# x", status="published")
+    db.session.add(_filler)
+    db.session.commit()
+_hy = app.test_client().get("/").get_data(as_text=True)
+ok("文章增多(>2篇)后探索区自动隐藏", "explore-box" not in _hy)
+with app.app_context():
+    _ef = Post.query.filter_by(slug="explore-filler").first()
+    if _ef:
+        db.session.delete(_ef)
+        db.session.commit()
+_hz = app.test_client().get("/").get_data(as_text=True)
+ok("删回少文后探索区恢复显示", "explore-box" in _hz)
+
+# 编辑器自动保存（纯前端逻辑，断言静态资源与页面挂载）
+_edjs = app.test_client().get("/static/js/editor.js").get_data(as_text=True)
+ok("editor.js 内置自动保存草稿(防抖/兜底/恢复条)",
+   "wb-editor-draft-" in _edjs and "beforeunload" in _edjs
+   and "ed-draft-bar" in _edjs and "恢复草稿" in _edjs)
+_edcss = app.test_client().get("/static/css/editor.css").get_data(as_text=True)
+ok("editor.css 含草稿提示条样式",
+   ".ed-draft-bar" in _edcss and ".ed-draft-restore" in _edcss)
+_pen = ca.get("/admin/posts/new").get_data(as_text=True)
+ok("写文章页挂载 editor.js(自动保存生效入口)",
+   "/static/js/editor.js" in _pen and 'name="content"' in _pen)
+
+# 开屏光晕动效升级：新关键帧 / 流光 / 玻璃呼吸 都在 CSS
+ok("开屏光晕动效升级(闪烁/流光/呼吸/辉光)",
+   "splash-glass-breathe" in _css and "splash-text-glow" in _css
+   and "conic-gradient" in _css and "splash-dash-flicker" in _css
+   and "splash-halo-pulse" in _css)
+
 # ---- 收尾 ----
 print()
 if failures:

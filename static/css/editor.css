@@ -225,6 +225,22 @@ body.ed-fullscreen .ed-body { flex: 1; }
 }
 @keyframes edToastIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
+/* 自动保存草稿提示条 */
+.ed-draft-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 16px; padding: 10px 16px; border-radius: 12px;
+  background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.32);
+  font-size: 13px;
+}
+.ed-draft-bar .ed-draft-info { flex: 1; color: var(--text-2); min-width: 200px; }
+.ed-draft-bar button {
+  border: none; padding: 5px 14px; border-radius: 999px;
+  cursor: pointer; font-size: 12.5px; transition: filter .2s, background .2s;
+}
+.ed-draft-bar .ed-draft-restore { background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; }
+.ed-draft-bar .ed-draft-discard { background: rgba(120, 120, 120, 0.16); color: var(--text-2); }
+.ed-draft-bar button:hover { filter: brightness(1.08); }
+
 /* 移动端适配 */
 @media (max-width: 900px) {
   .ed-body { flex-direction: column; min-height: 0; }

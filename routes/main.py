@@ -2,7 +2,7 @@ from datetime import datetime
 
 from flask import (Blueprint, abort, current_app, redirect, render_template,
                    request, session, url_for)
-from sqlalchemy import or_
+from sqlalchemy import func, or_, select
 
 from models import Category, Comment, Friend, Page, Post, Tag, User
 from utils import (format_datetime, get_client_ip, get_page,
@@ -81,11 +81,24 @@ def _published_posts():
 
 @main_bp.route("/")
 def index():
-    query = _published_posts().order_by(
-        Post.is_top.desc(), Post.published_at.desc()
-    )
+    tab = request.args.get("tab", "latest")
+    query = _published_posts()
+    if tab == "hot":
+        # 热度 = 互动加权（点赞×5 + 评论×10）+ 阅读兜底，同分新文在前。
+        # comment_count 是 Python property（非列），用关联子查询参与 SQL 排序
+        _cmt = (
+            select(func.count(Comment.id))
+            .where(Comment.post_id == Post.id, Comment.is_approved.is_(True))
+            .correlate(Post)
+            .scalar_subquery()
+        )
+        hot_expr = Post.likes * 5 + _cmt * 10 + Post.views
+        query = query.order_by(hot_expr.desc(), Post.published_at.desc())
+    else:
+        tab = "latest"
+        query = query.order_by(Post.is_top.desc(), Post.published_at.desc())
     posts, pager = paginate(query)
-    return render_template("index.html", posts=posts, pager=pager)
+    return render_template("index.html", posts=posts, pager=pager, tab=tab)
 
 
 @main_bp.route("/post/<slug>")

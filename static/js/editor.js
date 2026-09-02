@@ -733,4 +733,120 @@
     if (!renderModeInput.value) renderModeInput.value = "markdown";
   }
   init();
+
+  // ---------- 自动保存草稿（localStorage，防意外退出丢稿） ----------
+  var editorForm = wrap.closest("form");
+  var pidMatch = (location.pathname || "").match(/\/admin\/posts\/(\d+)\/edit/);
+  var draftKey = "wb-editor-draft-" + (pidMatch ? "post-" + pidMatch[1] : "new");
+  var draftBar = null;
+
+  function readDraft() {
+    try {
+      var raw = localStorage.getItem(draftKey);
+      if (!raw) return null;
+      var d = JSON.parse(raw);
+      return d && typeof d === "object" && d.savedAt ? d : null;
+    } catch (e) { return null; }
+  }
+  function writeDraft() {
+    try {
+      if (!editorForm) return;
+      var titleEl = editorForm.elements.namedItem("title");
+      var has = titleEl && titleEl.value.trim();
+      if (!has && !taMd.value.trim() && !taHtml.value.trim()) return;  // 全空不写
+      var data = { savedAt: Date.now(), fields: {}, md: taMd.value, html: taHtml.value };
+      Array.prototype.forEach.call(editorForm.elements, function (el) {
+        if (!el.name || el.name === "content" || el.name === "content_html") return;
+        if (el.type === "checkbox") data.fields[el.name] = el.checked ? "1" : "";
+        else if (el.type === "radio") { if (el.checked) data.fields[el.name] = el.value; }
+        else data.fields[el.name] = el.value;
+      });
+      localStorage.setItem(draftKey, JSON.stringify(data));
+    } catch (e) { /* localStorage 不可用/满则静默 */ }
+  }
+  function clearDraft() {
+    try { localStorage.removeItem(draftKey); } catch (e) {}
+  }
+  function humanTime(ts) {
+    var diff = Date.now() - ts;
+    if (diff < 60 * 1000) return "刚刚";
+    if (diff < 3600 * 1000) return Math.floor(diff / 60000) + " 分钟前";
+    var d = new Date(ts);
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+  function removeDraftBar() {
+    if (draftBar && draftBar.parentNode) draftBar.parentNode.removeChild(draftBar);
+    draftBar = null;
+  }
+  function restoreDraft(d) {
+    Object.keys(d.fields).forEach(function (name) {
+      var el = editorForm.elements.namedItem(name);
+      if (!el) return;
+      if (el.type === "checkbox") el.checked = d.fields[name] === "1";
+      else el.value = d.fields[name];
+    });
+    taMd.value = d.md;
+    taHtml.value = d.html;
+    lastSaved.md = d.md; lastSaved.html = d.html;   // 撤销基线跟随草稿
+    hist.md.undo = []; hist.html.undo = [];
+    /* 模式跟随草稿（若与当前不符），否则仅重渲染 */
+    if (typeof setMode === "function" &&
+        (d.fields.render_mode === "html" || d.fields.render_mode === "markdown") &&
+        d.fields.render_mode !== currentMode) {
+      setMode(d.fields.render_mode);
+    } else {
+      if (typeof renderPreview === "function") renderPreview();
+      if (typeof updateStats === "function") updateStats();
+    }
+    removeDraftBar();
+    clearDraft();
+    if (typeof toast === "function") toast("已恢复本地草稿");
+  }
+  function maybeShowDraftBar() {
+    if (!editorForm) return;
+    var d = readDraft();
+    if (!d) return;
+    draftBar = document.createElement("div");
+    draftBar.className = "ed-draft-bar";
+    var info = document.createElement("span");
+    info.className = "ed-draft-info";
+    info.textContent = "检测到本地草稿（" + humanTime(d.savedAt) + "保存，尚未提交到服务器）";
+    var bRestore = document.createElement("button");
+    bRestore.type = "button"; bRestore.className = "ed-draft-restore";
+    bRestore.textContent = "恢复草稿";
+    bRestore.addEventListener("click", function () {
+      if (window.confirm("用本地草稿覆盖当前编辑内容？")) restoreDraft(d);
+    });
+    var bDiscard = document.createElement("button");
+    bDiscard.type = "button"; bDiscard.className = "ed-draft-discard";
+    bDiscard.textContent = "丢弃";
+    bDiscard.addEventListener("click", function () { removeDraftBar(); clearDraft(); });
+    draftBar.appendChild(info); draftBar.appendChild(bRestore); draftBar.appendChild(bDiscard);
+    editorForm.insertBefore(draftBar, editorForm.firstChild);
+  }
+
+  var _submitted = false;
+  var _debTimer = null;
+  if (editorForm) {
+    /* 输入防抖 1.2s 自动保存（标题/正文/选项任意字段变化都会触发） */
+    editorForm.addEventListener("input", function () {
+      if (_submitted) return;
+      clearTimeout(_debTimer);
+      _debTimer = setTimeout(writeDraft, 1200);
+    });
+    /* 表单提交：已上服务器，清草稿并停止后续兜底写入 */
+    editorForm.addEventListener("submit", function () {
+      _submitted = true;
+      clearTimeout(_debTimer);
+      clearDraft();
+    });
+  }
+  /* 关标签 / 刷新 / 意外退出前的兜底：同步写一次 */
+  window.addEventListener("beforeunload", function () {
+    if (_submitted) return;
+    clearTimeout(_debTimer);
+    writeDraft();
+  });
+  maybeShowDraftBar();
 })();

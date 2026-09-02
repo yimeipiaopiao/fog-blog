@@ -110,6 +110,16 @@
         </div>
 
         {% if is_logged_in %}
+        <a class="nav-auth-btn" id="navBackAdmin" href="{{ url_for('admin.dashboard') }}"
+           title="回到后台" aria-label="回到后台">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9" rx="1.5"/>
+            <rect x="14" y="3" width="7" height="5" rx="1.5"/>
+            <rect x="14" y="12" width="7" height="9" rx="1.5"/>
+            <rect x="3" y="16" width="7" height="5" rx="1.5"/>
+          </svg>
+        </a>
         <a class="nav-auth-btn" id="navAuthBtn" href="{{ url_for('auth.logout') }}"
            title="登出{% if auth_user %}（{{ auth_user.username }}）{% endif %}"
            aria-label="登出">
@@ -164,6 +174,25 @@
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
   <script src="{{ url_for('static', filename='js/widgets.js') }}"></script>
+
+  <!-- 开屏动效（仅首页触发；JS 会从 .post-card 抓取最近/最热文章） -->
+  <div class="splash" id="splash" hidden aria-hidden="true">
+    <div class="splash-stage">
+      <button type="button" class="splash-enter" id="splashEnter" aria-label="点击进入博客">
+        <span class="splash-halo"></span>
+        <span class="splash-ring"></span>
+        <span class="splash-core">点击进入</span>
+        <span class="splash-hint">ENTER</span>
+      </button>
+      <div class="splash-cards" id="splashCards"></div>
+      <div class="splash-hint-bar">
+        <span class="splash-tip">点击文章卡片直接阅读 · 点击中央按钮进入首页</span>
+        <button type="button" class="splash-skip" id="splashSkip">跳过</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/splash.js') }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

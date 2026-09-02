@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from flask import (Blueprint, Response, abort, current_app, flash, redirect,
                    render_template, request, send_file, session, url_for)
-from sqlalchemy import or_
+from sqlalchemy import func, or_, select
 from werkzeug.utils import secure_filename
 
 from models import (Category, Comment, File, Friend, Log, Page, Post, Setting,
@@ -117,11 +117,27 @@ def _parse_publish_time(value):
 @admin_bp.route("/posts")
 def posts():
     status = request.args.get("status", "")
+    sort = request.args.get("sort", "time_desc")
     q = Post.query
     if status in ("draft", "published", "scheduled"):
         q = q.filter_by(status=status)
-    posts = q.order_by(Post.created_at.desc()).all()
-    return render_template("admin/posts.html", posts=posts, status=status)
+    if sort == "time_asc":
+        q = q.order_by(Post.published_at.asc(), Post.id.asc())
+    elif sort == "hot":
+        # 热度 = 互动加权（点赞×5 + 评论×10）+ 阅读兜底，同分新文在前。
+        # comment_count 是 Python property（非列），用关联子查询参与 SQL 排序
+        _cmt = (
+            select(func.count(Comment.id))
+            .where(Comment.post_id == Post.id, Comment.is_approved.is_(True))
+            .correlate(Post)
+            .scalar_subquery()
+        )
+        hot_expr = Post.likes * 5 + _cmt * 10 + Post.views
+        q = q.order_by(hot_expr.desc(), Post.published_at.desc())
+    else:
+        q = q.order_by(Post.published_at.desc(), Post.id.desc())
+    posts = q.all()
+    return render_template("admin/posts.html", posts=posts, status=status, sort=sort)
 
 
 @admin_bp.route("/posts/new", methods=["GET", "POST"])

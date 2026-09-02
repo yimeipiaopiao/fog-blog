@@ -13,10 +13,16 @@
 </div>
 
 <div class="filter-bar">
-  <a href="{{ url_for('admin.posts') }}" class="{{ 'active' if not status }}">全部</a>
-  <a href="{{ url_for('admin.posts', status='published') }}" class="{{ 'active' if status == 'published' }}">已发布</a>
-  <a href="{{ url_for('admin.posts', status='draft') }}" class="{{ 'active' if status == 'draft' }}">草稿</a>
-  <a href="{{ url_for('admin.posts', status='scheduled') }}" class="{{ 'active' if status == 'scheduled' }}">定时</a>
+  {% set cur_status = status if status in ('published', 'draft', 'scheduled') else none %}
+  <a href="{{ url_for('admin.posts', sort=sort) }}" class="{{ 'active' if not cur_status }}">全部</a>
+  <a href="{{ url_for('admin.posts', status='published', sort=sort) }}" class="{{ 'active' if cur_status == 'published' }}">已发布</a>
+  <a href="{{ url_for('admin.posts', status='draft', sort=sort) }}" class="{{ 'active' if cur_status == 'draft' }}">草稿</a>
+  <a href="{{ url_for('admin.posts', status='scheduled', sort=sort) }}" class="{{ 'active' if cur_status == 'scheduled' }}">定时</a>
+  <span style="flex:1;"></span>
+  <span class="filter-sep">排序</span>
+  <a href="{{ url_for('admin.posts', status=cur_status, sort='time_desc') }}" class="{{ 'active' if sort == 'time_desc' }}" title="按发布时间从新到旧">发布时间 ↓</a>
+  <a href="{{ url_for('admin.posts', status=cur_status, sort='time_asc') }}" class="{{ 'active' if sort == 'time_asc' }}" title="按发布时间从旧到新">发布时间 ↑</a>
+  <a href="{{ url_for('admin.posts', status=cur_status, sort='hot') }}" class="{{ 'active' if sort == 'hot' }}" title="按互动热度：点赞×5 + 评论×10 + 阅读">热度 🔥</a>
 </div>
 
 <div class="panel glass">
