@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}登录 · {{ SITE.site_name }}{% endblock %}
+{% block page_title %}欢迎回来{% endblock %}
+{% block page_subtitle %}登录后评论会显示你的头像与昵称{% endblock %}
+{% block content %}
+<div class="member-wrap">
+  <div class="member-card glass">
+    <h2>读者登录</h2>
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in msgs %}
+      <div class="flash-msg {{ cat }}" style="position: static; margin-bottom: 12px;">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    <form method="post" action="{{ url_for('member.login') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+      <div class="form-item">
+        <label>用户名</label>
+        <input type="text" name="username" required autofocus autocomplete="username" placeholder="请输入用户名">
+      </div>
+      <div class="form-item">
+        <label>密码</label>
+        <input type="password" name="password" required autocomplete="current-password" placeholder="请输入密码">
+      </div>
+      <button class="btn btn-block" type="submit">登 录</button>
+    </form>
+    <p class="member-switch">
+      还没有账号？
+      <a href="{{ url_for('member.register', next=request.args.get('next', '')) }}">立即注册</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

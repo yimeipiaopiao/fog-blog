@@ -1,0 +1,68 @@
+{% extends "admin/base.html" %}
+{% block title %}文章管理{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>文章管理</h1>
+    <p class="sub">共 {{ posts | length }} 篇</p>
+  </div>
+  <div style="display: flex; gap: 10px; align-items: center;">
+    <a class="btn" href="{{ url_for('admin.post_new') }}">写新文章</a>
+    <a class="btn ghost" href="{{ url_for('admin.pdf_new') }}" title="上传 PDF 自动提取文字生成文章草稿">PDF 转文章</a>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <a href="{{ url_for('admin.posts') }}" class="{{ 'active' if not status }}">全部</a>
+  <a href="{{ url_for('admin.posts', status='published') }}" class="{{ 'active' if status == 'published' }}">已发布</a>
+  <a href="{{ url_for('admin.posts', status='draft') }}" class="{{ 'active' if status == 'draft' }}">草稿</a>
+  <a href="{{ url_for('admin.posts', status='scheduled') }}" class="{{ 'active' if status == 'scheduled' }}">定时</a>
+</div>
+
+<div class="panel glass">
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>标题</th><th>分类</th><th>标签</th><th>状态</th><th>阅读</th><th>评论</th><th>发布时间</th><th style="width: 150px;">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in posts %}
+        <tr>
+          <td class="cell-title">
+            <a href="{{ url_for('admin.post_edit', pid=p.id) }}">{{ p.title }}</a>
+            {% if p.is_top %}<span class="badge" style="background: rgba(209,74,46,.1); color:#d14a2e;">置顶</span>{% endif %}
+            {% if p.render_mode == 'pdf' %}<span class="badge" style="background: rgba(209,74,46,.1); color:#d14a2e;">PDF</span>{% endif %}
+            {% if not p.allow_comment %}<span class="badge" style="background: rgba(120,120,120,.14); color: var(--text-3);">禁评</span>{% endif %}
+          </td>
+          <td class="cell-muted">{{ p.category.name if p.category else '-' }}</td>
+          <td class="cell-muted" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            {% for t in p.tags %}#{{ t.name }} {% endfor %}
+          </td>
+          <td>
+            <span class="badge {{ p.status }}">
+              {{ { 'published': '已发布', 'draft': '草稿', 'scheduled': '定时' }[p.status] }}
+            </span>
+          </td>
+          <td class="cell-muted">{{ p.views }}</td>
+          <td class="cell-muted">{{ p.comment_count }}</td>
+          <td class="cell-muted">{{ p.published_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>
+            <div class="btn-row">
+              <a class="btn sm ghost" href="{{ url_for('admin.post_edit', pid=p.id) }}">编辑</a>
+              <form method="post" action="{{ url_for('admin.post_delete', pid=p.id) }}" data-confirm="确定删除这篇文章吗？删除后不可恢复">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn sm danger-ghost" type="submit">删除</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" style="text-align:center; color: var(--text-3); padding: 30px;">暂无文章，点击右上角「写新文章」开始创作</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

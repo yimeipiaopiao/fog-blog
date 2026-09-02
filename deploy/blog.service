@@ -1,0 +1,34 @@
+[Unit]
+Description=Fog Blog (Flask + Gunicorn)
+Documentation=https://github.com/yourname/blog
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/blog
+Environment="PATH=/var/www/blog/venv/bin"
+EnvironmentFile=-/etc/blog/blog.env
+ExecStart=/var/www/blog/venv/bin/gunicorn \
+    --workers 2 \
+    --threads 4 \
+    --bind 127.0.0.1:8000 \
+    --access-logfile - \
+    --error-logfile - \
+    --timeout 60 \
+    --keep-alive 5 \
+    app:app
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+# 安全的加固选项
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/blog/uploads /var/www/blog/backup
+
+[Install]
+WantedBy=multi-user.target

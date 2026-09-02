@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}注册 · {{ SITE.site_name }}{% endblock %}
+{% block page_title %}创建账号{% endblock %}
+{% block page_subtitle %}注册后可以带着自己的头像昵称发表评论{% endblock %}
+{% block content %}
+<div class="member-wrap">
+  <div class="member-card glass">
+    <h2>读者注册</h2>
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in msgs %}
+      <div class="flash-msg {{ cat }}" style="position: static; margin-bottom: 12px;">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    <form method="post" action="{{ url_for('member.register') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-item">
+        <label>用户名 <em class="req">*</em></label>
+        <input type="text" name="username" required maxlength="20" autocomplete="username" placeholder="2-20 位字母/数字/下划线/中文">
+      </div>
+      <div class="form-item">
+        <label>昵称（默认同用户名）</label>
+        <input type="text" name="nickname" maxlength="20" placeholder="评论时显示的名字">
+      </div>
+      <div class="form-item">
+        <label>邮箱（选填，用于找回密码等）</label>
+        <input type="email" name="email" placeholder="you@example.com">
+      </div>
+      <div class="form-item">
+        <label>密码 <em class="req">*</em></label>
+        <input type="password" name="password" required minlength="6" autocomplete="new-password" placeholder="至少 6 位">
+      </div>
+      <div class="form-item">
+        <label>确认密码 <em class="req">*</em></label>
+        <input type="password" name="confirm" required minlength="6" autocomplete="new-password" placeholder="再输入一次">
+      </div>
+      <button class="btn btn-block" type="submit">注 册</button>
+    </form>
+    <p class="member-switch">
+      已有账号？
+      <a href="{{ url_for('member.login', next=request.args.get('next', '')) }}">去登录</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,165 @@
+{% extends "admin/base.html" %}
+{% block title %}站点设置{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>站点设置</h1>
+    <p class="sub">保存后前台立即生效</p>
+  </div>
+</div>
+
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="panel glass" style="max-width: 760px;">
+    <h2>基本信息</h2>
+    <div class="form-grid">
+      <div class="form-item">
+        <label>站点名称</label>
+        <input type="text" name="site_name" value="{{ SITE.site_name }}">
+      </div>
+      <div class="form-item">
+        <label>站点副标题</label>
+        <input type="text" name="site_subtitle" value="{{ SITE.site_subtitle }}">
+      </div>
+      <div class="form-item full">
+        <label>站点描述（SEO）</label>
+        <input type="text" name="site_description" value="{{ SITE.site_description }}">
+      </div>
+      <div class="form-item full">
+        <label>SEO 关键词</label>
+        <input type="text" name="site_keywords" value="{{ SITE.site_keywords }}">
+      </div>
+      <div class="form-item full">
+        <label>页脚文字</label>
+        <input type="text" name="footer_text" value="{{ SITE.footer_text }}">
+      </div>
+      <div class="form-item full">
+        <label>备案号（选填，留空不显示）</label>
+        <input type="text" name="icp" value="{{ SITE.icp }}" placeholder="例如：京ICP备12345678号">
+      </div>
+    </div>
+  </div>
+
+  <div class="panel glass" style="max-width: 760px;">
+    <h2>评论设置</h2>
+    <div class="form-item">
+      <label class="check-row">
+        <input type="checkbox" name="comment_allow" value="1" {{ 'checked' if SITE.comment_allow == '1' }}> 开启评论区
+      </label>
+    </div>
+    <div class="form-item">
+      <label class="check-row">
+        <input type="checkbox" name="comment_need_audit" value="1" {{ 'checked' if SITE.comment_need_audit == '1' }}> 新评论需要管理员审核后才展示
+      </label>
+    </div>
+  </div>
+
+  <div class="panel glass" style="max-width: 760px;">
+    <h2>博主信息（前台侧栏卡片）</h2>
+    <div class="form-grid">
+      <div class="form-item">
+        <label>昵称（留空用站点名）</label>
+        <input type="text" name="blogger_name" value="{{ SITE.blogger_name }}" placeholder="如：阿雾">
+      </div>
+      <div class="form-item">
+        <label>头像图片 URL（留空显示首字母圆）</label>
+        <input type="text" name="blogger_avatar" value="{{ SITE.blogger_avatar }}" placeholder="/uploads/image/xxx.png 或 https://...">
+      </div>
+      <div class="form-item full">
+        <label>一句话简介</label>
+        <input type="text" name="blogger_bio" value="{{ SITE.blogger_bio }}" placeholder="例如：写了 10 年代码的强迫症患者">
+      </div>
+    </div>
+  </div>
+
+  <div class="panel glass" style="max-width: 760px;">
+    <h2>每日一句（侧栏鸡汤）</h2>
+    <div class="form-item">
+      <label class="check-row">
+        <input type="checkbox" name="motto_enable" value="1" {{ 'checked' if SITE.motto_enable == '1' }}> 显示「每日一句」
+      </label>
+    </div>
+    <div class="form-item">
+      <label>自定义句库（每行一句，留空则使用内置句库；按日期轮换，每天都不同）</label>
+      <textarea name="motto_text" rows="6" placeholder="一行一句，例如：&#10;你只管努力，剩下的交给时间。&#10;星光不问赶路人，时光不负有心人。">{{ SITE.motto_text }}</textarea>
+    </div>
+  </div>
+
+  <div class="panel glass" style="max-width: 760px;">
+    <h2>外观配色（毛玻璃保持，仅换主色调与氛围光斑）</h2>
+    <div class="form-item">
+      <label>配色方案（前后台同步生效）</label>
+      <select name="color_palette">
+        {% set pal = SITE.color_palette or 'amber' %}
+        <option value="amber" {{ 'selected' if pal == 'amber' }}>焦糖琥珀（默认）</option>
+        <option value="sea" {{ 'selected' if pal == 'sea' }}>海盐蓝</option>
+        <option value="mint" {{ 'selected' if pal == 'mint' }}>抹茶青</option>
+        <option value="grape" {{ 'selected' if pal == 'grape' }}>葡萄紫</option>
+        <option value="rose" {{ 'selected' if pal == 'rose' }}>蔷薇粉</option>
+      </select>
+      <p style="font-size: 12px; color: var(--text-3); margin-top: 6px;">
+        每套配色均有配套的浅色 / 深色主题，改变后即时生效。
+      </p>
+    </div>
+  </div>
+
+  <div class="panel glass" style="max-width: 760px;">
+    <h2>深色模式</h2>
+    <div class="form-grid">
+      <div class="form-item">
+        <label>默认外观</label>
+        <select name="theme_default">
+          <option value="light" {{ 'selected' if SITE.theme_default == 'light' }}>浅色</option>
+          <option value="dark" {{ 'selected' if SITE.theme_default == 'dark' }}>深色</option>
+        </select>
+      </div>
+      <div class="form-item">
+        <label>自动切换方式（访客也可手动点导航按钮覆盖）</label>
+        <select name="theme_auto">
+          <option value="off" {{ 'selected' if SITE.theme_auto == 'off' }}>不自动（仅手动）</option>
+          <option value="schedule" {{ 'selected' if SITE.theme_auto == 'schedule' }}>按时间段自动切换</option>
+          <option value="system" {{ 'selected' if SITE.theme_auto == 'system' }}>跟随系统外观</option>
+        </select>
+      </div>
+      <div class="form-item">
+        <label>深色开始小时（0-23，按时间段模式）</label>
+        <input type="number" name="theme_dark_start" min="0" max="23" value="{{ SITE.theme_dark_start }}">
+      </div>
+      <div class="form-item">
+        <label>深色结束小时（0-23，支持跨天如 07）</label>
+        <input type="number" name="theme_dark_end" min="0" max="23" value="{{ SITE.theme_dark_end }}">
+      </div>
+    </div>
+    <div class="form-item">
+      <label class="check-row">
+        <input type="checkbox" name="theme_fix_content" value="1" {{ 'checked' if SITE.theme_fix_content == '1' }}> 深色模式下自动提亮正文中「写死成深色」的文字（反色修复，避免黑字看不见）
+      </label>
+    </div>
+  </div>
+
+  <div class="panel glass" style="max-width: 760px;">
+    <h2>天气小部件（免费接口，按访客 IP 定位）</h2>
+    <div class="form-item">
+      <label>默认城市（定位失败时兜底；填英文城市名如 Beijing，或 纬度,经度 如 30.67,104.06，留空则定位失败时隐藏）</label>
+      <input type="text" name="weather_default_city" value="{{ SITE.weather_default_city }}" placeholder="如 Beijing 或 30.67,104.06">
+    </div>
+  </div>
+
+  <div class="panel glass" style="max-width: 760px;">
+    <h2>读者账号与日志</h2>
+    <div class="form-item">
+      <label class="check-row">
+        <input type="checkbox" name="register_allow" value="1" {{ 'checked' if SITE.register_allow == '1' }}> 允许前台注册读者账号（默认关闭：博客仅管理员可登录后台，游客可直接评论）
+      </label>
+    </div>
+    <div class="form-item">
+      <label>操作日志保留天数（自动清理周期，默认 90 天）</label>
+      <input type="number" name="log_keep_days" min="7" max="3650" value="{{ SITE.log_keep_days }}">
+    </div>
+  </div>
+
+  <div style="max-width: 760px; margin-top: 4px;">
+    <button class="btn" type="submit">保存设置</button>
+  </div>
+</form>
+{% endblock %}
