@@ -28,8 +28,11 @@ LimitNOFILE=65535
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-# 写权限白名单：项目根（SQLite）+ uploads/backup（用户上传）+ /etc/nginx/ssl（SSL 证书）+ /etc/blog（env 文件）
-ReadWritePaths=/var/www/blog /var/www/blog/uploads /var/www/blog/backup /etc/nginx/ssl /etc/blog
+# 写权限白名单：
+# - /var/www/blog（SQLite）+ uploads/backup（用户上传）
+# - /etc/nginx/ssl（SSL 证书）+ sites-available/sites-enabled（nginx https 配置 + 软链）
+# - /etc/blog（env 配置目录）
+ReadWritePaths=/var/www/blog /var/www/blog/uploads /var/www/blog/backup /etc/nginx/ssl /etc/blog /etc/nginx/sites-available /etc/nginx/sites-enabled
 
 [Install]
 WantedBy=multi-user.target
