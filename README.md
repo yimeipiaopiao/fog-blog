@@ -120,6 +120,19 @@ cd /var/www/blog && git pull && systemctl restart blog   # 更新
 flask --app app create-user 新用户 密码          # 加管理员
 ```
 
+### HTTPS：后台上传 SSL 证书（宝塔式，上传即生效）
+
+后台「SSL 证书」页支持像宝塔面板一样粘贴证书与私钥，自动校验并生效，无需登录服务器：
+
+1. 用任意方式取得证书（`certbot --nginx -d 你的域名`、云厂商免费证书、商业证书均可），下载 **nginx 格式**的 `fullchain.pem`（含中间证书）与 `privkey.pem`。
+2. 登录后台 → 侧栏「SSL 证书」→「上传 / 更新证书」，粘贴域名 + 证书 + 私钥，点「校验并生效」。
+3. 后端自动完成：PEM 解析 → **证书与私钥配对校验** → **域名必须在证书 SAN/CN 内** → 有效期检查 → 写入 `/etc/nginx/ssl/<域名>/` → 生成 HTTPS server block → `nginx -t` → 自动 reload。任一步失败都不写盘（事务式），旧证书自动备份在 `/etc/nginx/ssl/<域名>/.backup/`。
+
+- 停用：状态页「停用 HTTPS」即回退 HTTP（证书文件保留）。
+- 更新：再传一份新证书即覆盖旧配置；历史记录保留最近 20 条，过期前 30 天状态页会提示。
+- 依赖 `deploy/install.sh` 部署的 sudo 白名单 wrapper（`/usr/local/bin/blog-ssl-apply`，仅 www-data 可经 sudo 执行，且只允许写 `/etc/nginx/ssl/` 与 reload nginx），私钥通过 stdin 传入、不落命令行。
+- 本地开发 / CI 无 wrapper 时，设置 `BLOG_SSL_DRY_RUN=1` 即只做解析与校验、不写盘（e2e 测试即此模式）。
+
 ## 常见问题
 
 **Q: 评论为什么不显示？**
