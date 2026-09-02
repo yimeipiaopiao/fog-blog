@@ -106,24 +106,11 @@
         </div>
 
         {% if is_logged_in %}
-        <a class="nav-auth-btn" id="navAuthBtn" href="{{ url_for('auth.logout') if auth_user else url_for('member.logout') }}"
-           title="登出{% if auth_user %}（{{ auth_user.username }}）{% elif reader_user %}（{{ reader_user.username }}）{% endif %}"
+        <a class="nav-auth-btn" id="navAuthBtn" href="{{ url_for('auth.logout') }}"
+           title="登出{% if auth_user %}（{{ auth_user.username }}）{% endif %}"
            aria-label="登出">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
         </a>
-        {% if reader_user %}
-        <div class="user-chip" id="userChip">
-          <button class="user-chip-btn" type="button" aria-haspopup="true" aria-expanded="false">
-            <span class="mini-avatar">{% if reader_user.avatar %}<img src="{{ reader_user.avatar }}" alt="">{% else %}{{ reader_user.nickname[:1] }}{% endif %}</span>
-            <span class="user-chip-name">{{ reader_user.nickname }}</span>
-            <svg class="ic-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="user-menu glass" id="userMenu" hidden>
-            <a href="{{ url_for('member.center') }}">个人中心</a>
-            <a href="{{ url_for('member.logout') }}">退出登录</a>
-          </div>
-        </div>
-        {% endif %}
         {% else %}
         <a class="nav-auth-btn" id="navAuthBtn" href="{{ url_for('auth.login') }}" title="登录" aria-label="登录">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.72">

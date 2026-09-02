@@ -3,7 +3,7 @@
 //   - 目标路径前缀 ^A: 注入 admin cookie；无前缀: 游客
 //   - 目标名含 "dark": 注入 localStorage wb-theme=dark 并重载
 //   - 目标名含 "emoji": 滚动到底并点开 emoji 面板，全页截图
-//   - 目标名含 "nocomment" / "register_gate" / "emoji_collapsed" / "pdfview": 滚动到底 + 全页截图
+//   - 目标名含 "nocomment" / "login_gate" / "emoji_collapsed" / "pdfview": 滚动到底 + 全页截图
 //   - 截前会清掉 localStorage.wb-theme 与上次 cookie，确保每个 target 状态干净
 //   - 目标名 "v6_*" 即可作为命名约定；本脚本不依赖具体版本名
 const { spawn } = require("child_process");
@@ -23,7 +23,7 @@ const TARGETS = [
   { p: "/post/welcome-to-fog-blog",                        name: "v6_post_emoji_collapsed" },
   { p: "/post/welcome-to-fog-blog",                        name: "v6_post_emoji",       emoji: true },
   { p: "/post/v5-nocomment",                               name: "v6_post_nocomment",   nocomment: true },
-  { p: "/user/register",                                   name: "v6_register_gate" },
+  { p: "/login",                                            name: "v6_login_gate" },
   { p: "A:/admin/pdf/new",                                 name: "v6_admin_pdf_new" },
   { p: "A:/admin/posts",                                   name: "v6_admin_posts" },
   { p: "A:/admin/settings",                                name: "v6_admin_settings" },
@@ -107,7 +107,7 @@ async function main() {
   for (const t of TARGETS) {
     let cookie = null, p = t.p;
     if (p.startsWith("A:")) { cookie = ADMIN_SESSION; p = p.slice(2); }
-    const fullPage = t.emoji || t.nocomment || t.name === "v6_register_gate" || t.name === "v6_post_emoji_collapsed" || t.pdfview;
+    const fullPage = t.emoji || t.nocomment || t.name === "v6_login_gate" || t.name === "v6_post_emoji_collapsed" || t.pdfview;
     const isDark = !!t.dark;
 
     // 清掉上次的 session cookie 与 localStorage，避免上一个 target 的 dark 偏好污染 light 截图

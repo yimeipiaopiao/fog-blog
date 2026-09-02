@@ -63,8 +63,4 @@ class Config:
         "weather_default_city": "",
         # ---- 日志自动清理（天）----
         "log_keep_days": "90",
-        # ---- 读者账号 ----
-        # 0=关闭：博客仅管理员登录（后台 /admin/login），前台游客可直接评论；
-        # 1=开放：前台可注册读者账号并登录评论
-        "register_allow": "0",
     }

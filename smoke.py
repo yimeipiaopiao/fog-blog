@@ -48,10 +48,10 @@ for p in ["/", "/post/welcome-to-fog-blog", "/category/tech", "/tag/flask",
     st, _ = get(p)
     check(p, st, 200 if p != "/404-not-exist" else 404)
 
-# 读者体系已关闭：注册/登录入口应引向后台登录（跟随重定向后带提示）
-for p, tip in [("/user/register", "未开放读者注册"), ("/user/login", "读者登录已停用")]:
-    st, html = get(p)
-    check(f"GET {p} -> 关闭提示「{tip}」", 200 if tip in html else st)
+# 旧读者入口已下线：/user/register、/user/login 等会 302 到 /login（后台登录）。
+for p in ["/user/register", "/user/login", "/user/center", "/user/logout"]:
+    st, _ = get(p)
+    check(f"GET {p} -> 302 重定向", 302 if st == 302 else st)
 
 # 登录流程
 st, html = get("/login")
@@ -64,7 +64,7 @@ for p in ["/admin/", "/admin/posts", "/admin/posts/1/edit", "/admin/posts/new",
           "/admin/categories", "/admin/tags", "/admin/comments",
           "/admin/pages", "/admin/pages/1/edit", "/admin/friends",
           "/admin/files", "/admin/settings", "/admin/backup",
-          "/admin/users", "/admin/users?tab=readers", "/admin/logs",
+          "/admin/users", "/admin/logs",
           "/admin/pdf/new"]:
     st, _ = get(p)
     check(p, st)
@@ -106,7 +106,6 @@ st, _ = post("/admin/settings", {
     "csrf_token": tok, "site_name": "雾里博客", "site_subtitle": "记录与分享，如雾般轻盈",
     "site_description": "desc", "site_keywords": "k1,k2", "footer_text": "",
     "icp": "", "comment_allow": "1", "comment_need_audit": "1",
-    "register_allow": "",  # 保持关闭（博客仅管理员登录，游客直接评论）
     "motto_enable": "1", "theme_fix_content": "1",
 })
 check("POST /admin/settings 保存设置", 302 if st == 302 else st)

@@ -29,16 +29,14 @@ def create_app(config_class=Config):
     # 站点设置缓存失效：后台修改后调用 invalidate_settings()
     @app.context_processor
     def inject_globals():
-        from utils import current_user, generate_csrf_token, get_reader, get_settings
+        from utils import current_user, generate_csrf_token, get_settings
 
         return {
             "SITE": get_settings(),
             "csrf_token": generate_csrf_token,
             "now": datetime.now,
-            # 全局登录态：admin（session['user_id']）或前台读者（session['uid']）任一即视为已登录
             "auth_user": current_user(),
-            "reader_user": get_reader(),
-            "is_logged_in": bool(current_user() or get_reader()),
+            "is_logged_in": current_user() is not None,
         }
 
     @app.errorhandler(404)

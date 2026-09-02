@@ -124,29 +124,6 @@ def login_required(view):
     return wrapper
 
 
-# ---------------- 前台读者账号（与后台 session 分离：reader 用 session["uid"]） ----------------
-
-def get_reader():
-    """当前前台登录读者（未登录返回 None）。"""
-    uid = session.get("uid")
-    if not uid:
-        return None
-    user = User.query.get(uid)
-    if not user or user.role != "user" or not user.is_active:
-        return None
-    return user
-
-
-def reader_login_required(view):
-    @wraps(view)
-    def wrapper(*args, **kwargs):
-        if not get_reader():
-            return redirect(url_for("member.login", next=request.path))
-        return view(*args, **kwargs)
-
-    return wrapper
-
-
 def get_client_ip():
     """真实客户端 IP：优先取 X-Forwarded-For 第一段（Nginx 反代场景）。"""
     xff = request.headers.get("X-Forwarded-For")
@@ -161,7 +138,7 @@ def write_log(action, target="", detail="", username=None):
     """写入一条操作日志（低频操作，直接 commit）。username 传字符串，缺省时取当前登录者。"""
     try:
         if not username:
-            u = current_user() or get_reader()
+            u = current_user()
             username = u.username if u else ""
         rec = Log(
             action=action[:32],

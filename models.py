@@ -39,7 +39,7 @@ class User(db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     nickname = db.Column(db.String(64), default="管理员")
-    role = db.Column(db.String(16), default="admin")   # admin=后台管理员 / user=前台读者
+    role = db.Column(db.String(16), default="admin")   # 后台账号，固定 admin（预留字段，老数据兼容）
     email = db.Column(db.String(128), default="")
     bio = db.Column(db.String(255), default="")
     avatar = db.Column(db.String(255), default="")     # 头像 URL，空则显示首字母圆

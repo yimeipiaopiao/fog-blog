@@ -5,7 +5,7 @@ from flask import (Blueprint, abort, current_app, redirect, render_template,
 from sqlalchemy import or_
 
 from models import Category, Comment, Friend, Page, Post, Tag, User
-from utils import (format_datetime, get_client_ip, get_page, get_reader,
+from utils import (format_datetime, get_client_ip, get_page,
                    get_setting, paginate, plain_text, random_guest_nickname,
                    reading_minutes, render_markdown)
 
@@ -49,7 +49,7 @@ def _pick_motto():
 
 @main_bp.context_processor
 def inject_globals():
-    """前台公共数据：导航分类、标签云、最新评论、热门文章、读者态、每日一句"""
+    """前台公共数据：导航分类、标签云、最新评论、热门文章、每日一句。"""
     categories = Category.query.order_by(Category.name).all()
     tags = Tag.query.order_by(Tag.name).all()
     pages = Page.query.filter_by(is_show=True).order_by(Page.order, Page.id).all()
@@ -71,7 +71,6 @@ def inject_globals():
         "nav_pages": pages,
         "recent_comments": recent_comments,
         "hot_posts": hot_posts,
-        "me": get_reader(),
         "daily_motto": _pick_motto(),
     }
 

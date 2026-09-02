@@ -97,10 +97,10 @@
       <ul class="comment-list">
         {% for c in comments %}
         <li class="comment-item">
-          <div class="comment-avatar">{% if c.user and c.user.avatar %}<img src="{{ c.user.avatar }}" alt="{{ c.nickname }}">{% else %}{{ (c.user.nickname if c.user else c.nickname)[:1] }}{% endif %}</div>
+          <div class="comment-avatar">{% if c.user and c.user.avatar %}<img src="{{ c.user.avatar }}" alt="{{ c.nickname }}">{% else %}{{ c.nickname[:1] }}{% endif %}</div>
           <div class="comment-body">
             <div class="comment-head">
-              <span class="name">{{ c.nickname }}{% if c.user %}<em class="reader-tag">读者</em>{% endif %}</span>
+              <span class="name">{{ c.nickname }}</span>
               <span class="time">{{ c.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
               {% if c.post_id == None %}<span class="badge purple">留言板</span>{% endif %}
             </div>

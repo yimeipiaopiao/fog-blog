@@ -564,13 +564,12 @@ def friend_delete(fid):
     return redirect(url_for("admin.friends"))
 
 
-# ---------------- 用户管理（后台账号 + 前台读者） ----------------
+# ---------------- 用户管理（后台账号） ----------------
 
 @admin_bp.route("/users")
 def users():
-    tab = request.args.get("tab", "staff")
     q = (request.args.get("q") or "").strip()
-    query = User.query.filter_by(role="admin") if tab == "staff" else User.query.filter_by(role="user")
+    query = User.query.filter_by(role="admin")
     if q:
         query = query.filter(or_(
             User.username.like(f"%{q}%"), User.nickname.like(f"%{q}%"),
@@ -579,9 +578,8 @@ def users():
     items = query.order_by(User.id.desc()).all()
     return render_template(
         "admin/users.html",
-        tab=tab, q=q, users=items,
-        staff_count=User.query.filter_by(role="admin").count(),
-        reader_count=User.query.filter_by(role="user").count(),
+        tab="staff", q=q, users=items,
+        staff_count=items.__len__(),
     )
 
 
@@ -602,7 +600,7 @@ def user_new():
         db.session.commit()
         write_log("user_new", f"创建后台账号：{username}", "", username=session_user())
         flash(f"后台账号 {username} 已创建", "success")
-    return redirect(url_for("admin.users", tab="staff"))
+    return redirect(url_for("admin.users"))
 
 
 @admin_bp.route("/users/<int:uid>/toggle", methods=["POST"])
@@ -615,16 +613,16 @@ def user_toggle(uid):
         u.is_active = not u.is_active
         db.session.commit()
         state = "停用" if not u.is_active else "启用"
-        write_log("user_toggle", f"{state}账号：{u.username}({'管理员' if u.role=='admin' else '读者'})",
+        role_label = "管理员" if u.role == "admin" else "账号"
+        write_log("user_toggle", f"{state}账号：{u.username}({role_label})",
                   "", username=session_user())
         flash(f"已{state}账号 {u.username}", "success")
-    tab = "staff" if u.role == "admin" else "readers"
-    return redirect(url_for("admin.users", tab=tab))
+    return redirect(url_for("admin.users"))
 
 
 @admin_bp.route("/users/<int:uid>/delete", methods=["POST"])
 def user_delete(uid):
-    """删除账号（不能删除自己）；读者历史评论保留但解除绑定。"""
+    """删除账号（不能删除自己）。"""
     u = User.query.get_or_404(uid)
     if u.id == session.get("user_id"):
         flash("不能删除自己的账号", "error")
@@ -632,16 +630,14 @@ def user_delete(uid):
     Comment.query.filter_by(user_id=u.id).update({"user_id": None}, synchronize_session=False)
     db.session.delete(u)
     db.session.commit()
-    write_log("user_delete", f"删除账号：{u.username}({'管理员' if u.role=='admin' else '读者'})",
-              "", username=session_user())
+    write_log("user_delete", f"删除账号：{u.username}", "", username=session_user())
     flash(f"账号 {u.username} 已删除", "success")
-    tab = "staff" if u.role == "admin" else "readers"
-    return redirect(url_for("admin.users", tab=tab))
+    return redirect(url_for("admin.users"))
 
 
 @admin_bp.route("/users/<int:uid>/reset", methods=["POST"])
 def user_reset(uid):
-    """重置密码（后台管理员改同事/读者密码）。"""
+    """重置密码（后台管理员改同事密码）。"""
     u = User.query.get_or_404(uid)
     pwd = request.form.get("password") or ""
     if len(pwd) < 6:
@@ -651,8 +647,7 @@ def user_reset(uid):
         db.session.commit()
         write_log("user_reset", f"重置密码：{u.username}", "", username=session_user())
         flash(f"{u.username} 的密码已重置", "success")
-    tab = "staff" if u.role == "admin" else "readers"
-    return redirect(url_for("admin.users", tab=tab))
+    return redirect(url_for("admin.users"))
 
 
 def session_user():
@@ -708,7 +703,7 @@ def settings():
     if request.method == "POST":
         # 复选框类开关：勾选=1，未勾选=0（置空）
         checkbox_keys = {"comment_allow", "comment_need_audit", "motto_enable",
-                         "theme_fix_content", "register_allow"}
+                         "theme_fix_content"}
         changed = 0
         for key in current_app.config["DEFAULT_SETTINGS"]:
             if key in checkbox_keys:

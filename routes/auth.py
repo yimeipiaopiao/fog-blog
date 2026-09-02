@@ -19,7 +19,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             if user.role != "admin":
-                flash("该账号是前台读者账号，请从博客前台登录", "error")
+                flash("该账号已被停用，请联系管理员", "error")
             else:
                 session["user_id"] = user.id
                 user.last_login_at = datetime.now()

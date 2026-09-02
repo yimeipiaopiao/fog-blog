@@ -9,8 +9,8 @@ from flask import Blueprint, current_app, jsonify, request, session
 from werkzeug.utils import secure_filename
 
 from models import Comment, File, Post, db
-from utils import (current_user, get_client_ip, get_reader, get_setting,
-                   login_required, write_log)
+from utils import (current_user, get_client_ip, get_setting,
+                   login_required, random_guest_nickname, write_log)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -28,14 +28,13 @@ def add_comment():
         return jsonify({"ok": False, "msg": "评论区已关闭"}), 400
 
     post_id = request.form.get("post_id", type=int)
-    reader = get_reader()
     nickname = (request.form.get("nickname") or "").strip()
     email = (request.form.get("email") or "").strip()
     content = (request.form.get("content") or "").strip()
 
-    # 登录读者：自动使用账号昵称/邮箱，游客保留手填
-    if reader:
-        nickname, email = reader.nickname, reader.email
+    # 游客评论：未填昵称时按 IP 稳定派生（同一 IP 多次评论同昵称）
+    if not nickname:
+        nickname = random_guest_nickname(get_client_ip())
     if not nickname or len(nickname) > 20:
         return jsonify({"ok": False, "msg": "请填写昵称（20 字以内）"}), 400
     if not content or len(content) > 1000:
@@ -52,14 +51,14 @@ def add_comment():
     if not post.allow_comment:
         return jsonify({"ok": False, "msg": "该文章已关闭评论"}), 403
 
-    # 管理员评论直接通过；登录读者/游客按审核设置
+    # 管理员评论直接通过；游客按审核设置
     is_admin = current_user() is not None
     need_audit = get_setting("comment_need_audit", "1") == "1"
     approved = is_admin or not need_audit
 
     c = Comment(
         post_id=post_id,
-        user_id=reader.id if reader else None,
+        user_id=None,
         nickname=nickname,
         email=email,
         content=content,
