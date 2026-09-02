@@ -22,6 +22,8 @@ const TARGETS = [
   { p: "A:/admin/posts",        name: "v10_posts_delete_modal",     admin: true, splash: false,
     actions: ["openDeleteModal"] },
   { p: "A:/admin/posts/trash",  name: "v10_trash_view",             admin: true, splash: false, fullPage: true },
+  { p: "A:/admin/files",        name: "v10_files_delete_modal",     admin: true, splash: false,
+    actions: ["openFileDelModal"] },
 ];
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
@@ -215,6 +217,15 @@ async function main() {
         expression:
           // 找第一个 data-confirm 表单的删除按钮 → click → 我们的 wb-modal.js 会拦截
           "(function(){var f=document.querySelector('form[data-confirm]'); if(!f) return 'no-form'; var b=f.querySelector('button[type=submit]'); if(!b) return 'no-btn'; b.click(); return 'clicked';})()",
+        returnByValue: true,
+      });
+      await sleep(500);
+    }
+    if (t.actions && t.actions.includes("openFileDelModal")) {
+      await sleep(300);
+      await call("Runtime.evaluate", {
+        expression:
+          "document.querySelector('[data-del]')?.click();",
         returnByValue: true,
       });
       await sleep(500);
