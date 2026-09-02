@@ -89,7 +89,7 @@
     <h2>外观配色（毛玻璃保持，仅换主色调与氛围光斑）</h2>
     <div class="form-item">
       <label>配色方案（前后台同步生效）</label>
-      <select name="color_palette">
+      <select id="selColorPalette" name="color_palette" data-bind="color_palette">
         {% set pal = SITE.color_palette or 'amber' %}
         <option value="amber" {{ 'selected' if pal == 'amber' }}>焦糖琥珀（默认）</option>
         <option value="sea" {{ 'selected' if pal == 'sea' }}>海盐蓝</option>
@@ -99,6 +99,7 @@
       </select>
       <p style="font-size: 12px; color: var(--text-3); margin-top: 6px;">
         每套配色均有配套的浅色 / 深色主题，改变后即时生效。
+        前台 / 后台任一处切换，两边都会自动跟随。
       </p>
     </div>
   </div>
@@ -143,14 +144,14 @@
     <div class="form-grid">
       <div class="form-item">
         <label>默认外观</label>
-        <select name="theme_default">
+        <select id="selThemeDefault" name="theme_default" data-bind="theme_default">
           <option value="light" {{ 'selected' if SITE.theme_default == 'light' }}>浅色</option>
           <option value="dark" {{ 'selected' if SITE.theme_default == 'dark' }}>深色</option>
         </select>
       </div>
       <div class="form-item">
         <label>自动切换方式（访客也可手动点导航按钮覆盖）</label>
-        <select name="theme_auto">
+        <select id="selThemeAuto" name="theme_auto" data-bind="theme_auto">
           <option value="off" {{ 'selected' if SITE.theme_auto == 'off' }}>不自动（仅手动）</option>
           <option value="schedule" {{ 'selected' if SITE.theme_auto == 'schedule' }}>按时间段自动切换</option>
           <option value="system" {{ 'selected' if SITE.theme_auto == 'system' }}>跟随系统外观</option>
@@ -158,11 +159,13 @@
       </div>
       <div class="form-item">
         <label>深色开始小时（0-23，按时间段模式）</label>
-        <input type="number" name="theme_dark_start" min="0" max="23" value="{{ SITE.theme_dark_start }}">
+        <input id="inpDarkStart" type="number" name="theme_dark_start" data-bind="theme_dark_start"
+               min="0" max="23" value="{{ SITE.theme_dark_start }}">
       </div>
       <div class="form-item">
         <label>深色结束小时（0-23，支持跨天如 07）</label>
-        <input type="number" name="theme_dark_end" min="0" max="23" value="{{ SITE.theme_dark_end }}">
+        <input id="inpDarkEnd" type="number" name="theme_dark_end" data-bind="theme_dark_end"
+               min="0" max="23" value="{{ SITE.theme_dark_end }}">
       </div>
     </div>
     <div class="form-item">
@@ -195,6 +198,109 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  /* 配色 / 深浅色 select 与前台切换器"双向同步"
+   *  - 进入页面：把当前 localStorage + WB_THEME 反映到 select.value
+   *  - 改 select：立即生效并写 DB（管理员身份）
+   *  - 监听 WB_PALETTE_APPLY 派发的 wb:palette-applied / WB_THEME_SYNC_FORMS 派发的 wb:theme-pref-applied
+   */
+  (function () {
+    var csrf = (document.querySelector('input[name="csrf_token"]') || {}).value || "";
+    function flash(msg, cat) {
+      var box = document.createElement("div");
+      box.className = "flash-msg " + (cat || "success");
+      box.setAttribute("data-auto-hide", "");
+      box.textContent = msg;
+      document.body.appendChild(box);
+      setTimeout(function () {
+        box.style.transition = "opacity 0.4s";
+        box.style.opacity = "0";
+        setTimeout(function () { box.remove(); }, 450);
+      }, 1600);
+    }
+
+    /* 1. 进入页面：把当前生效值同步到 select，避免"切换了但下拉框显示陈旧值" */
+    var selPal = document.getElementById("selColorPalette");
+    if (selPal) {
+      var cur = null;
+      try { cur = localStorage.getItem("wb-palette"); } catch (e) {}
+      if (!cur && window.WB_PALETTE_GET_DEFAULT) cur = window.WB_PALETTE_GET_DEFAULT();
+      if (cur && [].slice.call(selPal.options).some(function (o) { return o.value === cur; })) {
+        selPal.value = cur;
+      }
+      /* change：立刻调主切换器（持久化 + 写 DB） */
+      selPal.addEventListener("change", function () {
+        var v = selPal.value;
+        if (window.WB_PALETTE_APPLY) window.WB_PALETTE_APPLY(v, true);
+        flash("已切换为「" + (selPal.selectedOptions[0] ? selPal.selectedOptions[0].text : v) + "」", "success");
+      });
+      /* 主题切换器（含左侧 dock 弹层）修改时，下拉跟着变 */
+      selPal.addEventListener("wb:palette-applied", function (ev) {
+        if (ev && ev.detail && ev.detail.value && selPal.value !== ev.detail.value) {
+          selPal.value = ev.detail.value;
+        }
+      });
+    }
+
+    /* 2. theme_default / theme_auto / 时间小时数：change 后调 WB_THEME_APPLY / WB_THEME_SYNC_FORMS 并 POST */
+    function syncFieldToServer(field, value) {
+      try {
+        fetch("/api/site-prefs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf, "X-Requested-With": "fetch" },
+          body: JSON.stringify((function () { var o = {}; o[field] = value; return o; })()),
+          credentials: "same-origin"
+        }).then(function (r) { if (!r.ok) console.warn("prefs sync failed:", r.status); })
+          .catch(function () {});
+      } catch (e) {}
+    }
+
+    function bindThemePref(id, field, coerce) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var evt = function () {
+        var v = coerce ? coerce(el.value) : el.value;
+        if (field === "theme_default") {
+          /* 让 WB_THEME 立即重读默认值；并把 T.def 推到最新 */
+          if (window.WB_THEME) window.WB_THEME.def = v;
+          if (window.WB_THEME_APPLY) window.WB_THEME_APPLY();
+        } else if (field === "theme_auto") {
+          if (window.WB_THEME) window.WB_THEME.auto = v;
+          if (window.WB_THEME_APPLY) window.WB_THEME_APPLY();
+        } else if (field === "theme_dark_start") {
+          if (window.WB_THEME) window.WB_THEME.start = parseInt(v, 10) || 0;
+          if (window.WB_THEME_APPLY) window.WB_THEME_APPLY();
+        } else if (field === "theme_dark_end") {
+          if (window.WB_THEME) window.WB_THEME.end = parseInt(v, 10) || 0;
+          if (window.WB_THEME_APPLY) window.WB_THEME_APPLY();
+        }
+        syncFieldToServer(field, v);
+        flash("已保存" + (el.previousElementSibling ? "「" + el.previousElementSibling.textContent + "」" : ""), "success");
+      };
+      el.addEventListener("change", evt);
+      el.addEventListener("input", field.indexOf("dark_") === 0 ? evt : null);
+      el.addEventListener("wb:theme-pref-applied", function (ev) {
+        if (ev && ev.detail && ev.detail.value != null && el.value !== ev.detail.value) el.value = ev.detail.value;
+      });
+    }
+    bindThemePref("selThemeDefault", "theme_default");
+    bindThemePref("selThemeAuto", "theme_auto");
+    bindThemePref("inpDarkStart", "theme_dark_start", function (v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; });
+    bindThemePref("inpDarkEnd", "theme_dark_end", function (v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; });
+
+    /* 3. 监听 storage：其它标签切换时也同步过来（即使跨 tab 都开 settings） */
+    window.addEventListener("storage", function (ev) {
+      if (!ev.key) return;
+      if (ev.key === "wb-palette" && selPal) {
+        var v = localStorage.getItem("wb-palette");
+        if (v && selPal.value !== v) selPal.value = v;
+      }
+      if (ev.key === "wb-theme" && window.WB_THEME_SYNC_FORMS) {
+        window.WB_THEME_SYNC_FORMS(window.WB_THEME_GET ? window.WB_THEME_GET() : null);
+      }
+    });
+  })();
+</script>
 <script>
   /* 保存后立即广播（前端把服务端最新 prefs 同步到 localStorage 与页面） */
   (function () {

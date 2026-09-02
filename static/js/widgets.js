@@ -150,6 +150,13 @@ function defPalette() {
         opts[i].classList.toggle("is-active", on);
       }
     }
+    /* 同步所有绑定过的表单 select（站点设置页 / 其他入口） */
+    var sels = document.querySelectorAll('select[data-bind="color_palette"]');
+    for (var j = 0; j < sels.length; j++) {
+      if (sels[j].value !== v) sels[j].value = v;
+      /* 自定义事件，让 settings.html 可以监听（即时保存提示） */
+      sels[j].dispatchEvent(new CustomEvent("wb:palette-applied", { detail: { value: v, persist: !!persist } }));
+    }
     if (persist) {
       try { localStorage.setItem("wb-palette", v); } catch (e) {}
       syncToServer(v);
@@ -206,9 +213,18 @@ function defPalette() {
           opts[i].classList.toggle("is-active", opts[i].getAttribute("data-palette") === v);
         }
       }
+      /* 同步 select（即使本页发起 storage 也兜底一下） */
+      var sels = document.querySelectorAll('select[data-bind="color_palette"]');
+      for (var j = 0; j < sels.length; j++) {
+        if (sels[j].value !== v) sels[j].value = v;
+      }
     } else {
       var dv = document.documentElement.getAttribute("data-default-palette") || "amber";
       root.setAttribute("data-palette", dv);
+      var sels2 = document.querySelectorAll('select[data-bind="color_palette"]');
+      for (var k = 0; k < sels2.length; k++) {
+        if (sels2[k].value !== dv) sels2[k].value = dv;
+      }
     }
   });
 })();

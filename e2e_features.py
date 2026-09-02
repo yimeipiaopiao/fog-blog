@@ -283,6 +283,66 @@ ca.post("/api/site-prefs",
         headers={"Content-Type": "application/json", "X-CSRF-Token": CSRF})
 
 
+# ---------------- 7.2 settings 下拉框双向同步（DOM 结构 + 跨页面回显） ----------------
+# 现在 settings 页的 select 必须能跟 /api/site-prefs 保持一致：
+#   1. DOM 上要有 data-bind / id
+#   2. 改了 select 后立即把值写回 DB（下次 GET settings 时 select 默认值随之变）
+#   3. POST /api/site-prefs → 再 GET settings，select 默认值反映服务端
+
+_settings_html = ca.get("/admin/settings").get_data(as_text=True)
+ok("settings 含 data-bind color_palette select",
+   'name="color_palette" data-bind="color_palette"' in _settings_html)
+ok("settings 含 data-bind theme_default select",
+   'name="theme_default" data-bind="theme_default"' in _settings_html)
+ok("settings 含 data-bind theme_auto select",
+   'name="theme_auto" data-bind="theme_auto"' in _settings_html)
+ok("settings 含 data-bind theme_dark_start input",
+   'name="theme_dark_start" data-bind="theme_dark_start"' in _settings_html)
+ok("settings 含 data-bind theme_dark_end input",
+   'name="theme_dark_end" data-bind="theme_dark_end"' in _settings_html)
+
+# 改 DB → 重新渲染 settings → 默认 selected 应当跟着变
+import re as _re
+sel_default = _re.search(
+    r'name="color_palette"[^>]*>\s*<option value="amber"[^>]*selected',
+    _settings_html)
+ok("settings 渲染时 color_palette 默认 selected=amber（与 DB 当前值一致）",
+   sel_default is not None)
+
+# 模拟"前台切换"，把 DB color_palette 改成 grape
+ca.post("/api/site-prefs",
+        json={"color_palette": "grape"},
+        headers={"Content-Type": "application/json", "X-CSRF-Token": CSRF})
+_settings2 = ca.get("/admin/settings").get_data(as_text=True)
+ok("POST /api/site-prefs 后 settings 默认 selected=grape",
+   'name="color_palette" data-bind="color_palette"' in _settings2 and
+   'value="grape" selected' in _settings2)
+
+# 反向：settings select 的 selected 值要由服务端 SETTING 表驱动
+gv = app.test_client()
+gv_prefs = gv.get("/api/site-prefs").get_json()
+ok("GET /api/site-prefs 公开返回包含已写入的 color_palette",
+   gv_prefs and gv_prefs.get("ok") and
+   gv_prefs.get("prefs", {}).get("color_palette") == "grape")
+
+# 重置回 amber，方便后续 case
+ca.post("/api/site-prefs",
+        json={"color_palette": "amber", "theme_default": "light"},
+        headers={"Content-Type": "application/json", "X-CSRF-Token": CSRF})
+
+
+# ---------------- 7.3 后台不再有 .admin-topbar 整个横栏 ----------------
+_dash = ca.get("/admin/").get_data(as_text=True)
+ok("后台不再渲染 .admin-topbar 横栏",
+   'class="admin-topbar"' not in _dash)
+ok("后台渲染左侧底部 .prefs-dock 双按钮",
+   'class="prefs-dock"' in _dash)
+ok(".prefs-dock 内含 #themeToggle 与 #paletteToggle",
+   'class="prefs-dock"' in _dash and
+   'id="themeToggle"' in _dash and
+   'id="paletteToggle"' in _dash)
+
+
 # ---------------- 8. 侧栏部件 ----------------
 for needle in ["blogger", "motto", "weatherCard", "cdToday", "cdMonth", "cdYear"]:
     ok(f"首页 HTML 含侧栏部件标记 {needle}", needle in html)

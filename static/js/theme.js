@@ -159,6 +159,42 @@
     });
   }
 
+  /* 把当前 theme 状态同步到表单 select（站点设置页的下拉框） */
+  function syncThemeSelects(prefs) {
+    if (!prefs) prefs = {};
+    function setSel(name, val) {
+      if (val == null || val === "") return;
+      var sels = document.querySelectorAll('select[data-bind="' + name + '"]');
+      for (var i = 0; i < sels.length; i++) {
+        var opts = sels[i].querySelectorAll("option");
+        for (var oi = 0; oi < opts.length; oi++) {
+          if (opts[oi].value === val && sels[i].value !== val) {
+            sels[i].value = val;
+            sels[i].dispatchEvent(new CustomEvent("wb:theme-pref-applied",
+              { detail: { field: name, value: val } }));
+          }
+        }
+      }
+    }
+    function setInput(name, val) {
+      if (val == null || val === "") return;
+      var ins = document.querySelectorAll('input[data-bind="' + name + '"]');
+      for (var i = 0; i < ins.length; i++) {
+        if (ins[i].value !== String(val)) {
+          ins[i].value = String(val);
+          ins[i].dispatchEvent(new CustomEvent("wb:theme-pref-applied",
+            { detail: { field: name, value: val } }));
+        }
+      }
+    }
+    var sd = prefs.theme_default || (T.def === "dark" ? "dark" : "light");
+    setSel("theme_default", sd);
+    setSel("theme_auto", prefs.theme_auto || T.auto || "off");
+    setInput("theme_dark_start", prefs.theme_dark_start || String(T.start));
+    setInput("theme_dark_end", prefs.theme_dark_end || String(T.end));
+  }
+  window.WB_THEME_SYNC_FORMS = syncThemeSelects;
+
   /* 跨标签实时同步：同源其它标签写 wb-theme → 立刻 apply() */
   window.addEventListener("storage", function (ev) {
     if (!ev.key || ev.key === "wb-theme" || ev.key === "wb-palette") apply();
@@ -166,6 +202,15 @@
 
   /* 暴露给模板 / 跨页面主动同步用 */
   window.WB_THEME_APPLY = apply;
+  window.WB_THEME_GET = function () {
+    return {
+      theme_default: T.def === "dark" ? "dark" : "light",
+      theme_auto: T.auto || "off",
+      theme_dark_start: String(T.start),
+      theme_dark_end: String(T.end),
+      theme_fix_content: T.fix
+    };
+  };
 
   /* 从服务端拉最新偏好并应用（仅管理员调用） */
   function applyServerPrefs(prefs) {
@@ -190,8 +235,12 @@
       T.auto = themeAuto;
     }
     apply();
+    syncThemeSelects(prefs);
   }
   window.WB_THEME_APPLY_SERVER_PREFS = applyServerPrefs;
+
+  /* 页面初始化时也同步一次（保证 settings 页 select 显示当前生效值） */
+  syncThemeSelects();
 
   apply();
 })();
