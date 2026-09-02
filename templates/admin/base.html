@@ -24,8 +24,10 @@
     };
     (function () {
       try {
-        var p = localStorage.getItem('wb-palette');
-        if (p) document.documentElement.setAttribute('data-palette', p);
+        /* 后台永远以 server 权威值为准 —— 清掉陈旧 wb-palette 避免覆盖新配色 */
+        if (localStorage.getItem('wb-palette')) {
+          localStorage.removeItem('wb-palette');
+        }
       } catch (e) {}
     })();
     (function () {

@@ -24,9 +24,12 @@
       isAdmin: {{ 'true' if (auth_user and auth_user.role == 'admin') else 'false' }},
       isMember: {{ 'true' if is_logged_in else 'false' }}
     };
-    /* 配色初始化：用户自选存 localStorage，未设则保留后端默认值 */
+    /* 配色初始化：未登录访客可保留本地偏好（per-browser override）；
+       登录用户以 server 权威值为准 —— 避免其他设备/标签改配色后被本浏览器陈旧值盖回去。 */
     (function () {
       try {
+        var loggedIn = WB_THEME.isAdmin || WB_THEME.isMember;
+        if (loggedIn) return;
         var p = localStorage.getItem('wb-palette');
         if (p) document.documentElement.setAttribute('data-palette', p);
       } catch (e) {}

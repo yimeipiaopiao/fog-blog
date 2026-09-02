@@ -218,12 +218,18 @@
     var palette = prefs.color_palette;
     var themeDefault = prefs.theme_default;
     var themeAuto = prefs.theme_auto;
-    /* 配色：仅当 localStorage 没有用户自选时，覆盖为服务端默认 */
+    var loggedIn = !!(T.isAdmin || T.isMember);
+    /* 配色：登录用户 server 权威（直接覆盖，即便 localStorage 有陈旧值）；
+       访客保留 per-browser override */
     if (palette) {
       try {
-        if (!localStorage.getItem("wb-palette")) {
+        if (loggedIn || !localStorage.getItem("wb-palette")) {
           document.documentElement.setAttribute("data-palette", palette);
           root.setAttribute("data-default-palette", palette);
+        }
+        if (loggedIn && localStorage.getItem("wb-palette") !== palette) {
+          /* 登录后清掉 localStorage 陈旧值 —— 不再让浏览器本地偏好污染 server 同步 */
+          localStorage.removeItem("wb-palette");
         }
       } catch (e) {}
     }
