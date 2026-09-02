@@ -47,7 +47,7 @@ class Config:
         "blogger_name": "",
         "blogger_avatar": "",
         "blogger_bio": "",
-        # ---- 每日一句（多行，每行一句；留空使用内置默认句库）----
+        # ---- 每日鸡汤（多行，每行一句；留空使用内置默认句库）----
         "motto_enable": "1",
         "motto_text": "",
         # ---- 深色模式 ----

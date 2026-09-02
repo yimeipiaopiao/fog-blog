@@ -11,7 +11,7 @@ from utils import (format_datetime, get_client_ip, get_page,
 
 main_bp = Blueprint("main", __name__)
 
-# 内置「每日一句」句库（后台可覆盖）
+# 内置「每日鸡汤」句库（后台可覆盖）
 _BUILTIN_MOTTOS = [
     "你只管努力，剩下的交给时间。",
     "种一棵树最好的时间是十年前，其次是现在。",
@@ -49,7 +49,7 @@ def _pick_motto():
 
 @main_bp.context_processor
 def inject_globals():
-    """前台公共数据：导航分类、标签云、最新评论、热门文章、每日一句。"""
+    """前台公共数据：导航分类、标签云、最新评论、热门文章、每日鸡汤。"""
     categories = Category.query.order_by(Category.name).all()
     tags = Tag.query.order_by(Tag.name).all()
     pages = Page.query.filter_by(is_show=True).order_by(Page.order, Page.id).all()
