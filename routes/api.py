@@ -8,9 +8,10 @@ import urllib.request
 from flask import Blueprint, current_app, jsonify, request, session
 from werkzeug.utils import secure_filename
 
-from models import Comment, File, Post, db
-from utils import (current_user, get_client_ip, get_setting,
-                   login_required, random_guest_nickname, write_log)
+from models import Comment, File, Post, Setting, db
+from utils import (current_user, get_client_ip, get_setting, get_settings,
+                   invalidate_settings, login_required,
+                   random_guest_nickname, write_log)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -271,3 +272,75 @@ def weather():
     body = {"ok": True, "city": display or key, **wx}
     _WEATHER_CACHE[key] = (now, body)
     return jsonify(body)
+
+
+# ---------------- 站点偏好（配色 / 深浅色）：前后台实时同步 ----------------
+# 访客可读：用来初始化前后台的 data-palette / theme_default 等"权威默认值"
+# 写：必须登录管理员；且仅允许写视觉类偏好（color_palette / theme_default）
+#   → 这样前台游客预览切换不会污染 DB，只在管理员操作时才落库
+
+_SITE_PREFS_KEYS = {
+    "color_palette",      # amber / sea / mint / grape / rose
+    "theme_default",      # light / dark
+    "theme_auto",         # off / schedule / system
+    "theme_dark_start",   # 0-23
+    "theme_dark_end",     # 0-23
+    "theme_fix_content",  # 0/1
+}
+
+_PALETTE_OK = {"amber", "sea", "mint", "grape", "rose"}
+_THEME_LIGHT_OK = {"light", "dark"}
+_AUTO_OK = {"off", "schedule", "system"}
+
+
+@api_bp.route("/site-prefs", methods=["GET"])
+def site_prefs_get():
+    """GET /api/site-prefs — 任何人可读；用于初始化前后台"默认值"以便实时同步。"""
+    # 取 DB 当前生效值（而不是 DEFAULT_SETTINGS 默认值）
+    current = get_settings()
+    out = {k: current.get(k, "") for k in _SITE_PREFS_KEYS if k in current}
+    return jsonify({"ok": True, "prefs": out})
+
+
+@api_bp.route("/site-prefs", methods=["POST"])
+@login_required
+def site_prefs_post():
+    """POST /api/site-prefs — 仅管理员可写；用于实时切换后立即落库，让所有标签页同步。"""
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "msg": "请求体需为 JSON 对象"}), 400
+    changed = []
+    for k, v in payload.items():
+        if k not in _SITE_PREFS_KEYS:
+            continue
+        s = str(v).strip()
+        # 字段校验
+        if k == "color_palette":
+            if s not in _PALETTE_OK:
+                return jsonify({"ok": False, "msg": f"非法配色：{s}"}), 400
+        elif k == "theme_default":
+            if s not in _THEME_LIGHT_OK:
+                return jsonify({"ok": False, "msg": f"非法默认主题：{s}"}), 400
+        elif k == "theme_auto":
+            if s not in _AUTO_OK:
+                return jsonify({"ok": False, "msg": f"非法自动模式：{s}"}), 400
+        elif k in ("theme_dark_start", "theme_dark_end"):
+            try:
+                n = int(s)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "msg": f"{k} 必须是 0-23 的整数"}), 400
+            if not (0 <= n <= 23):
+                return jsonify({"ok": False, "msg": f"{k} 越界（0-23）"}), 400
+            s = str(n)
+        elif k == "theme_fix_content":
+            s = "1" if s in ("1", "true", "True", "on", "yes") else ""
+        Setting.set(k, s)
+        changed.append(k)
+    if changed:
+        db.session.commit()
+        invalidate_settings()
+        write_log("site_prefs_save", "实时切换站点偏好", ",".join(changed))
+    # 回读最新生效值（get_settings 走 get_settings 缓存，会自动 invalidate）
+    latest = get_settings()
+    out = {k: latest.get(k, "") for k in _SITE_PREFS_KEYS if k in latest}
+    return jsonify({"ok": True, "prefs": out, "changed": changed})

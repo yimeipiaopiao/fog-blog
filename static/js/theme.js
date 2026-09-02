@@ -1,7 +1,42 @@
-/* 深色模式：手动切换 / 时段与系统自动 / 高亮主题联动 / 正文深色字反色修复 */
+/* 深色模式：手动切换 / 时段与系统自动 / 高亮主题联动 / 正文深色字反色修复
+ * + 实时同步（管理员）：切换时双写 DB（/api/site-prefs）；
+ * + 跨标签实时同步（storage 事件：所有标签通过 localStorage 同步偏好）。 */
 (function () {
-  var T = window.WB_THEME || { def: "light", auto: "off", start: 19, end: 7, fix: "0" };
+  var T = window.WB_THEME || { def: "light", auto: "off", start: 19, end: 7, fix: "0", isAdmin: false };
   var root = document.documentElement;
+
+  /* 管理员 → 同步到后端（fire-and-forget；失败仅 console.warn 不影响视觉） */
+  function syncToServer(field, value) {
+    if (!T.isAdmin) return;
+    var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
+    try {
+      fetch("/api/site-prefs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrf,
+          "X-Requested-With": "fetch"
+        },
+        body: JSON.stringify((function () { var o = {}; o[field] = value; return o; })()),
+        credentials: "same-origin"
+      })
+        .then(function (r) { if (!r.ok) console.warn("site-prefs sync failed:", r.status); })
+        .catch(function (e) { console.warn("site-prefs sync error:", e); });
+    } catch (e) {}
+  }
+
+  /* 当前深浅档位（light / dark / auto），用于显示按钮图标 */
+  function currentMode() {
+    try {
+      var m = localStorage.getItem("wb-theme");
+      if (m === "light" || m === "dark") return m;
+    } catch (e) {}
+    return "auto";
+  }
+  function setButtonMode() {
+    var btn = document.getElementById("themeToggle");
+    if (btn) btn.setAttribute("data-mode", currentMode());
+  }
 
   function isDarkHour() {
     var h = new Date().getHours(), s = Number(T.start), e = Number(T.end);
@@ -36,6 +71,7 @@
                   nxt === "light" ? "当前深色，点击切换浅色" :
                   "恢复自动（跟随系统/时段）";
     }
+    setButtonMode();
   }
 
   /* 反色修复：正文里「写死成深色」的内联文字，深色下自动提亮 */
@@ -53,7 +89,6 @@
   function fixContentColors(dark) {
     var targets = document.querySelectorAll(".post-content *, .page-content *");
     if (!dark || T.fix !== "1") {
-      // 回到浅色/关闭修复：还原被改过的内联颜色
       for (var r = 0; r < targets.length; r++) {
         if (targets[r].dataset && targets[r].dataset.wbOrig) {
           targets[r].style.color = targets[r].dataset.wbOrig;
@@ -74,7 +109,7 @@
     }
   }
 
-  /* 模拟“自动”档位的视觉，用于判断手动档切回自动时是否会产生无变化点击 */
+  /* 模拟"自动"档位的视觉 */
   function autoVisual() {
     var had = localStorage.getItem("wb-theme");
     localStorage.removeItem("wb-theme");
@@ -83,10 +118,6 @@
     return v;
   }
 
-  /* 计算下一次点击应该切换到的档位，保证每点一次视觉必变：
-     - 手动浅色 → 深色
-     - 手动深色 → 自动；若自动档视觉仍是深色（时段/系统在夜间），则直接回浅色
-     - 自动档    → 切到与当前视觉相反的档位（原来自动→浅色会造成“点了没反应”） */
   function plannedNext() {
     var f = localStorage.getItem("wb-theme");
     var cur = effective();
@@ -97,21 +128,22 @@
 
   function toggle() {
     var next = plannedNext();
-    if (next === "auto") localStorage.removeItem("wb-theme"); else localStorage.setItem("wb-theme", next);
+    if (next === "auto") localStorage.removeItem("wb-theme");
+    else localStorage.setItem("wb-theme", next);
     apply();
+    syncToServer("theme_default", effective() === "dark" ? "dark" : "light");
   }
 
   var btn = document.getElementById("themeToggle");
   if (btn) btn.addEventListener("click", toggle);
 
-  // 跟随系统时监听系统外观变化
   if (T.auto === "system" && window.matchMedia) {
     try {
       matchMedia("(prefers-color-scheme: dark)").addEventListener("change", apply);
     } catch (e) {}
   }
 
-  // 个人中心头像下拉菜单
+  /* 个人中心头像下拉菜单 */
   var chip = document.getElementById("userChip");
   var menu = document.getElementById("userMenu");
   if (chip && menu) {
@@ -126,6 +158,40 @@
       if (!chip.contains(e.target)) { menu.hidden = true; cbtn.setAttribute("aria-expanded", "false"); }
     });
   }
+
+  /* 跨标签实时同步：同源其它标签写 wb-theme → 立刻 apply() */
+  window.addEventListener("storage", function (ev) {
+    if (!ev.key || ev.key === "wb-theme" || ev.key === "wb-palette") apply();
+  });
+
+  /* 暴露给模板 / 跨页面主动同步用 */
+  window.WB_THEME_APPLY = apply;
+
+  /* 从服务端拉最新偏好并应用（仅管理员调用） */
+  function applyServerPrefs(prefs) {
+    if (!prefs || typeof prefs !== "object") return;
+    var palette = prefs.color_palette;
+    var themeDefault = prefs.theme_default;
+    var themeAuto = prefs.theme_auto;
+    /* 配色：仅当 localStorage 没有用户自选时，覆盖为服务端默认 */
+    if (palette) {
+      try {
+        if (!localStorage.getItem("wb-palette")) {
+          document.documentElement.setAttribute("data-palette", palette);
+          root.setAttribute("data-default-palette", palette);
+        }
+      } catch (e) {}
+    }
+    /* 默认主题覆盖：服务端说现在 light，就把 T.def 改成 light */
+    if (themeDefault) {
+      T.def = themeDefault;
+    }
+    if (themeAuto) {
+      T.auto = themeAuto;
+    }
+    apply();
+  }
+  window.WB_THEME_APPLY_SERVER_PREFS = applyServerPrefs;
 
   apply();
 })();

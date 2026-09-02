@@ -1,0 +1,91 @@
+/* ============================================================
+ *  后台主题切换控件 · 与前台同套样式保持视觉一致
+ *  - 顶栏放切换按钮（深浅色 / 配色 / 登出）
+ *  - 引用前台的 .theme-toggle / .palette-wrap CSS 变量
+ * ============================================================ */
+
+.admin-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin: -6px -8px 22px;
+  padding: 6px 10px;
+  background: var(--glass-bg, rgba(255, 252, 246, 0.45));
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid var(--glass-border, rgba(255, 250, 240, 0.7));
+  border-radius: 14px;
+}
+.admin-topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.admin-topbar-right { display: flex; align-items: center; gap: 8px; flex: none; }
+
+.admin-topbar-right .theme-toggle,
+.admin-topbar-right .nav-auth-btn,
+.admin-topbar-right .palette-toggle {
+  width: 36px; height: 36px; padding: 0;
+  border: 1px solid var(--glass-border, rgba(255, 250, 240, 0.7));
+  border-radius: 10px;
+  background: var(--glass-bg, rgba(255, 252, 246, 0.55));
+  color: var(--text-2, #6d5d47);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s;
+  text-decoration: none;
+}
+.admin-topbar-right .theme-toggle:hover,
+.admin-topbar-right .nav-auth-btn:hover,
+.admin-topbar-right .palette-toggle:hover {
+  background: rgba(var(--primary-rgb, 180, 83, 9), 0.12);
+  color: var(--primary, #b45309);
+}
+.admin-topbar-right .theme-toggle svg { transition: opacity 0.18s, transform 0.18s; }
+.admin-topbar-right .theme-toggle .ic-moon { display: none; }
+.admin-topbar-right .theme-toggle .ic-auto { display: none; }
+.admin-topbar-right .theme-toggle[data-mode="dark"] .ic-sun { display: none; }
+.admin-topbar-right .theme-toggle[data-mode="dark"] .ic-moon { display: inline-block; }
+.admin-topbar-right .theme-toggle[data-mode="auto"] .ic-sun { display: none; }
+.admin-topbar-right .theme-toggle[data-mode="auto"] .ic-auto { display: inline-block; }
+
+.palette-wrap { position: relative; }
+.palette-picker {
+  position: absolute; right: 0; top: calc(100% + 8px);
+  width: 220px; padding: 12px; border-radius: 12px; z-index: 50;
+}
+.palette-picker-title { font-size: 12px; color: var(--text-3, #a38d72); margin-bottom: 8px; padding: 2px 4px; }
+.palette-options { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.palette-options button {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 9px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--glass-border, rgba(255, 250, 240, 0.7));
+  background: transparent; color: var(--text-2, #6d5d47);
+  font-size: 12.5px; transition: all 0.15s;
+}
+.palette-options button:hover { background: rgba(var(--primary-rgb, 180, 83, 9), 0.08); }
+.palette-options button.is-active {
+  border-color: var(--primary, #b45309);
+  background: rgba(var(--primary-rgb, 180, 83, 9), 0.12);
+  color: var(--primary, #b45309); font-weight: 500;
+}
+.palette-options .sw { width: 16px; height: 16px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08); }
+.sw-amber { background: linear-gradient(135deg, #b45309, #d97706); }
+.sw-sea   { background: linear-gradient(135deg, #0e7490, #0891b2); }
+.sw-mint  { background: linear-gradient(135deg, #0f766e, #14b8a6); }
+.sw-grape { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+.sw-rose  { background: linear-gradient(135deg, #be185d, #ec4899); }
+
+.palette-reset {
+  display: block; width: 100%; margin-top: 8px; padding: 7px 9px;
+  border-radius: 8px; cursor: pointer; font-size: 12.5px;
+  border: 1px dashed var(--glass-border, rgba(255, 250, 240, 0.7));
+  background: transparent; color: var(--text-3, #a38d72);
+}
+.palette-reset:hover { color: var(--primary, #b45309); }
+
+@media (max-width: 720px) {
+  .admin-topbar { margin-top: 4px; }
+  .palette-picker { width: 200px; right: -8px; }
+}
+
+/* 深色模式下补足 nav-auth-btn / theme-toggle 颜色对比 */
+html[data-theme="dark"] .admin-topbar-right .theme-toggle,
+html[data-theme="dark"] .admin-topbar-right .nav-auth-btn,
+html[data-theme="dark"] .admin-topbar-right .palette-toggle {
+  color: #e7d8c3;
+}

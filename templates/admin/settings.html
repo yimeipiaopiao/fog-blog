@@ -196,6 +196,33 @@
 
 {% block scripts %}
 <script>
+  /* 保存后立即广播（前端把服务端最新 prefs 同步到 localStorage 与页面） */
+  (function () {
+    var latest = {{ broadcast_prefs | tojson if broadcast_prefs else 'null' }};
+    if (!latest) return;
+    function fire(key, value) {
+      try {
+        var prev = localStorage.getItem(key);
+        localStorage.setItem(key, value);
+        if (prev !== value) {
+          /* 自己写自己读 storage 不会触发事件 → 手动调对应 apply */
+          if (key === 'wb-palette' && window.WB_PALETTE_APPLY) window.WB_PALETTE_APPLY(value, false);
+          if (key === 'wb-theme' && window.WB_THEME_APPLY) window.WB_THEME_APPLY();
+        }
+      } catch (e) {}
+    }
+    if (latest.color_palette) fire('wb-palette', latest.color_palette);
+    if (latest.theme_default) {
+      var cur = (effective_value = localStorage.getItem('wb-theme'));
+      /* 仅在用户没手动选过 light/dark 时，才把默认主题刷进本地 */
+      if (!cur || cur === 'auto') {
+        /* 不动 wb-theme（auto），交给 theme.apply 读最新的 T.def（已经由 broadcast_prefs 设过） */
+      }
+    }
+    if (window.WB_THEME_APPLY_SERVER_PREFS) window.WB_THEME_APPLY_SERVER_PREFS(latest);
+  })();
+</script>
+<script>
   /* 自定义背景图：上传 → 回填 URL / 实时预览 / 滑杆百分比 */
   (function () {
     var imgInput = document.getElementById("bgImgInput");

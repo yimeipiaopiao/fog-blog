@@ -198,6 +198,91 @@ with app.app_context():
     ok("register_allow 已不再保存", "register_allow" not in sv)
 
 
+# ---------------- 7.1 配色 / 主题实时同步 API ----------------
+# 访客 GET（无登录）：返回当前 prefs；可让前后台在加载时拉最新值
+gv = app.test_client().get("/api/site-prefs")
+gv_body = gv.get_data(as_text=True)
+gv_ok = gv.status_code == 200 and ('"ok":true' in gv_body or '"ok": true' in gv_body) \
+    and "color_palette" in gv_body and "theme_default" in gv_body
+ok("GET /api/site-prefs 访客可读且含核心字段", gv_ok)
+
+# 访客 POST 被 login_required 拦截
+gv2 = app.test_client().post("/api/site-prefs",
+                             json={"color_palette": "sea"},
+                             headers={"Content-Type": "application/json",
+                                      "X-CSRF-Token": CSRF})
+ok("POST /api/site-prefs 访客被拒(redirect 302 / 401 / 403 / 400)",
+   gv2.status_code in (302, 401, 403, 400))
+
+# 管理员 POST：写 color_palette / theme_default
+r = ca.post("/api/site-prefs",
+            json={"color_palette": "sea", "theme_default": "dark"},
+            headers={"Content-Type": "application/json",
+                     "X-CSRF-Token": CSRF})
+body = r.get_data(as_text=True)
+ok("管理员 POST /api/site-prefs 写配色+深色 -> 200",
+   r.status_code == 200 and ('"changed"' in body) and "sea" in body and "dark" in body)
+
+with app.app_context():
+    sv = {s.key: s.value for s in Setting.query.all()}
+    ok("color_palette 已落库=sea", sv.get("color_palette") == "sea")
+    ok("theme_default 已落库=dark", sv.get("theme_default") == "dark")
+
+# 字段白名单：非法配色被拒
+r = ca.post("/api/site-prefs",
+            json={"color_palette": "neon"},
+            headers={"Content-Type": "application/json",
+                     "X-CSRF-Token": CSRF})
+ok("非法 color_palette 被 400 拒绝", r.status_code == 400)
+
+# 字段白名单：小时数边界
+r = ca.post("/api/site-prefs",
+            json={"theme_dark_start": "25"},
+            headers={"Content-Type": "application/json",
+                     "X-CSRF-Token": CSRF})
+ok("非法 theme_dark_start 越界被 400 拒绝", r.status_code == 400)
+
+r = ca.post("/api/site-prefs",
+            json={"theme_fix_content": "1"},
+            headers={"Content-Type": "application/json",
+                     "X-CSRF-Token": CSRF})
+ok("theme_fix_content=1 写入", r.status_code == 200)
+with app.app_context():
+    sv = {s.key: s.value for s in Setting.query.all()}
+    ok("theme_fix_content 落库=1", sv.get("theme_fix_content") == "1")
+
+# 管理员后台页面包含 theme.js / widgets.js / admin-prefs.css
+_dash = ca.get("/admin/").get_data(as_text=True)
+ok("后台 dashboard 渲染 200", _dash and "admin-shell" in _dash)
+ok("后台 dashboard 含 themeToggle 按钮", 'id="themeToggle"' in _dash)
+ok("后台 dashboard 含 paletteToggle 按钮", 'id="paletteToggle"' in _dash)
+ok("后台 dashboard 引入 theme.js", "/static/js/theme.js" in _dash)
+ok("后台 dashboard 引入 widgets.js", "/static/js/widgets.js" in _dash)
+ok("后台 dashboard 引入 admin-prefs.css", "/static/css/admin-prefs.css" in _dash)
+ok("后台 dashboard 含 isAdmin 标记",
+   "isAdmin" in _dash or 'data-default-palette' in _dash)
+
+# 前台访客页面：仍使用 widgets/theme（isAdmin=空，不写 DB）
+_pf = app.test_client().get("/").get_data(as_text=True)
+ok("前台含 WB_THEME 初始化脚本", "WB_THEME" in _pf)
+ok("前台含 theme.js", "/static/js/theme.js" in _pf)
+
+# 校验 widgets.js 中确实有同步逻辑 / themeToggle 暴露的全局
+wjs = app.test_client().get("/static/js/widgets.js").get_data(as_text=True)
+ok("widgets.js 含 /api/site-prefs 同步分支", "/api/site-prefs" in wjs)
+ok("widgets.js 暴露 WB_PALETTE_APPLY 全局", "WB_PALETTE_APPLY" in wjs)
+
+tjs = app.test_client().get("/static/js/theme.js").get_data(as_text=True)
+ok("theme.js 含 /api/site-prefs 同步分支", "/api/site-prefs" in tjs)
+ok("theme.js 暴露 WB_THEME_APPLY_SERVER_PREFS", "WB_THEME_APPLY_SERVER_PREFS" in tjs)
+
+
+# 还原默认配色，避免影响后续断言
+ca.post("/api/site-prefs",
+        json={"color_palette": "amber", "theme_default": "light"},
+        headers={"Content-Type": "application/json", "X-CSRF-Token": CSRF})
+
+
 # ---------------- 8. 侧栏部件 ----------------
 for needle in ["blogger", "motto", "weatherCard", "cdToday", "cdMonth", "cdYear"]:
     ok(f"首页 HTML 含侧栏部件标记 {needle}", needle in html)

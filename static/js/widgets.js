@@ -14,7 +14,6 @@
     if (t.indexOf("fog") >= 0 || t.indexOf("mist") >= 0 || t.indexOf("haze") >= 0) return ICONS.fog;
     if (t.indexOf("overcast") >= 0 || (t.indexOf("cloud") >= 0 && t.indexOf("part") < 0)) return ICONS.overcast;
     if (t.indexOf("part") >= 0 && t.indexOf("cloud") >= 0) return ICONS.partly;
-    if (t.indexOf("wind") >= 0) return ICONS.windy;
     if (t.indexOf("sun") >= 0 || t.indexOf("clear") >= 0) return ICONS.sunny;
     return "🌤️";
   }
@@ -100,7 +99,7 @@
     setInterval(tick, 30000);
   }
 
-  // ---------- 访客自选配色（5 套毛玻璃主题） ----------
+  // ---------- 配色选择器（实时同步） ----------
   (function () {
     var wrap = document.getElementById("paletteWrap");
     if (!wrap) return;
@@ -109,35 +108,65 @@
     var reset = document.getElementById("paletteReset");
     if (!btn || !picker) return;
 
-    function defPalette() {
-      return document.documentElement.getAttribute("data-default-palette") || "amber";
+    var isAdmin = !!(window.WB_THEME && window.WB_THEME.isAdmin);
+
+    function getCsrf() {
+      var m = document.querySelector('meta[name="csrf-token"]');
+      return m ? m.content : "";
     }
-    function currentPalette() {
-      return document.documentElement.getAttribute("data-palette") || defPalette();
+
+    function syncToServer(palette) {
+      if (!isAdmin) return;
+      try {
+        fetch("/api/site-prefs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": getCsrf(),
+            "X-Requested-With": "fetch"
+          },
+          body: JSON.stringify({ color_palette: palette }),
+          credentials: "same-origin"
+        })
+          .then(function (r) { if (!r.ok) console.warn("palette sync failed:", r.status); })
+          .catch(function (e) { console.warn("palette sync error:", e); });
+      } catch (e) {}
     }
-    function applyPalette(v, persist) {
-      document.documentElement.setAttribute("data-palette", v);
-      // 高亮当前选项
-      var opts = picker.querySelectorAll("[data-palette]");
+
+function defPalette() {
+    return document.documentElement.getAttribute("data-default-palette") || "amber";
+  }
+  function currentPalette() {
+    return document.documentElement.getAttribute("data-palette") || defPalette();
+  }
+  function applyPalette(v, persist) {
+    document.documentElement.setAttribute("data-palette", v);
+    document.documentElement.setAttribute("data-user-palette", v);
+    var pick = document.getElementById("palettePicker");
+    if (pick) {
+      var opts = pick.querySelectorAll("[data-palette]");
       for (var i = 0; i < opts.length; i++) {
         var on = opts[i].getAttribute("data-palette") === v;
         opts[i].classList.toggle("is-active", on);
       }
-      if (persist) {
-        try { localStorage.setItem("wb-palette", v); } catch (e) {}
-      }
     }
+    if (persist) {
+      try { localStorage.setItem("wb-palette", v); } catch (e) {}
+      syncToServer(v);
+    }
+  }
+  window.WB_PALETTE_APPLY = applyPalette;
+  window.WB_PALETTE_GET_CURRENT = currentPalette;
+  window.WB_PALETTE_GET_DEFAULT = defPalette;
     function close() { picker.hidden = true; }
     function toggle() { picker.hidden = !picker.hidden; }
 
-    // 初始化高亮
     applyPalette(currentPalette(), false);
 
     btn.addEventListener("click", function (e) {
       e.stopPropagation();
       toggle();
     });
-    // 选色
     var opts = picker.querySelectorAll("[data-palette]");
     for (var i = 0; i < opts.length; i++) {
       opts[i].addEventListener("click", function (ev) {
@@ -146,15 +175,14 @@
         close();
       });
     }
-    // 恢复默认
     if (reset) {
       reset.addEventListener("click", function () {
         try { localStorage.removeItem("wb-palette"); } catch (e) {}
         applyPalette(defPalette(), false);
+        if (isAdmin) syncToServer(defPalette());
         close();
       });
     }
-    // 点外部 / Esc 关闭
     document.addEventListener("click", function (e) {
       if (picker.hidden) return;
       if (!wrap.contains(e.target)) close();
@@ -163,4 +191,24 @@
       if (e.key === "Escape" && !picker.hidden) close();
     });
   })();
+
+  /* 跨标签同步：同源其它标签写 wb-palette → 实时 applyPalette */
+  window.addEventListener("storage", function (ev) {
+    if (ev.key !== "wb-palette") return;
+    var v = localStorage.getItem("wb-palette");
+    var picker = document.getElementById("palettePicker");
+    var root = document.documentElement;
+    if (v) {
+      root.setAttribute("data-palette", v);
+      if (picker) {
+        var opts = picker.querySelectorAll("[data-palette]");
+        for (var i = 0; i < opts.length; i++) {
+          opts[i].classList.toggle("is-active", opts[i].getAttribute("data-palette") === v);
+        }
+      }
+    } else {
+      var dv = document.documentElement.getAttribute("data-default-palette") || "amber";
+      root.setAttribute("data-palette", dv);
+    }
+  });
 })();

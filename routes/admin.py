@@ -721,12 +721,20 @@ def settings():
         checkbox_keys = {"comment_allow", "comment_need_audit", "motto_enable",
                          "theme_fix_content"}
         changed = 0
+        saved_prefs = {}  # 用于跨标签广播：key -> 新值
         for key in current_app.config["DEFAULT_SETTINGS"]:
             if key in checkbox_keys:
-                Setting.set(key, "1" if request.form.get(key) == "1" else "")
+                new_val = "1" if request.form.get(key) == "1" else ""
+                Setting.set(key, new_val)
+                if key in ("theme_fix_content",):
+                    saved_prefs[key] = new_val
                 changed += 1
             elif key in request.form:
-                Setting.set(key, (request.form.get(key) or "").strip())
+                new_val = (request.form.get(key) or "").strip()
+                Setting.set(key, new_val)
+                if key in ("color_palette", "theme_default", "theme_auto",
+                           "theme_dark_start", "theme_dark_end"):
+                    saved_prefs[key] = new_val
                 changed += 1
             # 表单未提交的其它键：保持原值不清空
         # 背景图透明度约束在 5-100（防手改库/异常值）
@@ -737,10 +745,23 @@ def settings():
         Setting.set("site_bg_opacity", str(_op))
         db.session.commit()
         invalidate_settings()
+        # 把刚才保存的视觉类偏好通过"一次性 token + payload"塞到 session；
+        # 模板渲染时输出到 localStorage，触发同源其它标签 storage 事件 → 实时同步
+        if saved_prefs:
+            session["wb_broadcast_prefs"] = saved_prefs
         write_log("settings_save", "更新站点设置", f"共 {changed} 项", username=session_user())
         flash("设置已保存", "success")
         return redirect(url_for("admin.settings"))
-    return render_template("admin/settings.html")
+    # 渲染前消费一次广播 token（仅首屏渲染时刷一次）
+    broadcast_prefs = session.pop("wb_broadcast_prefs", None)
+    if not broadcast_prefs:
+        # 读最新值（避免重复广播时丢失）
+        broadcast_prefs = {
+            k: current_app.config["DEFAULT_SETTINGS"].get(k, "")
+            for k in ("color_palette", "theme_default", "theme_auto",
+                      "theme_dark_start", "theme_dark_end", "theme_fix_content")
+        }
+    return render_template("admin/settings.html", broadcast_prefs=broadcast_prefs)
 
 
 # ---------------- 备份 ----------------
