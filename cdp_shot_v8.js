@@ -17,6 +17,7 @@ const CDP_PORT = 9337;
 
 const TARGETS = [
   { p: "A:/admin/",         name: "v8_admin_dashboard_no_topbar", admin: true, splash: false },
+  { p: "A:/admin/pages",    name: "v8_admin_pages_sea",          admin: true, splash: false, fullPage: true },
   { p: "A:/admin/settings", name: "v8_admin_settings_docks",     admin: true, splash: false, fullPage: false },
   { p: "A:/admin/settings", name: "v8_admin_settings_picker_open", admin: true, splash: false, actions: ["openPalettePicker"] },
   { p: "/",                 name: "v8_home_default",             admin: false, splash: true },
