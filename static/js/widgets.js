@@ -109,6 +109,7 @@
     if (!btn || !picker) return;
 
     var isAdmin = !!(window.WB_THEME && window.WB_THEME.isAdmin);
+    var isLoggedIn = !!(window.WB_THEME && (window.WB_THEME.isAdmin || window.WB_THEME.isMember));
 
     function getCsrf() {
       var m = document.querySelector('meta[name="csrf-token"]');
@@ -116,7 +117,9 @@
     }
 
     function syncToServer(palette) {
-      if (!isAdmin) return;
+      /* 访客（未登录）只写 localStorage —— 不污染其他访客偏好
+         登录用户（含普通会员/管理员）都写 server —— 让所有设备/标签/前后台一致 */
+      if (!isLoggedIn && !isAdmin) return;
       try {
         fetch("/api/site-prefs", {
           method: "POST",

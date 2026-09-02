@@ -20,7 +20,9 @@
       auto: {{ SITE.theme_auto | tojson }},
       start: {{ (SITE.theme_dark_start or '19') | int }},
       end: {{ (SITE.theme_dark_end or '07') | int }},
-      fix: {{ '1' if SITE.theme_fix_content == '1' else '0' }}
+      fix: {{ '1' if SITE.theme_fix_content == '1' else '0' }},
+      isAdmin: {{ 'true' if (auth_user and auth_user.role == 'admin') else 'false' }},
+      isMember: {{ 'true' if is_logged_in else 'false' }}
     };
     /* 配色初始化：用户自选存 localStorage，未设则保留后端默认值 */
     (function () {

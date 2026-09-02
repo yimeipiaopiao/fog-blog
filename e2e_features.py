@@ -342,6 +342,22 @@ ok(".prefs-dock 内含 #themeToggle 与 #paletteToggle",
    'id="themeToggle"' in _dash and
    'id="paletteToggle"' in _dash)
 
+# --- 关键修复断言：DB 改 color_palette 后，所有后台页面首屏渲染就是新值 ---
+# 不再依赖进程级缓存：每个请求都从 DB 读最新值（之前的 cache 会在第一次请求后冻住）
+ca.post("/api/site-prefs", json={"color_palette": "grape"},
+        headers={"Content-Type": "application/json", "X-CSRF-Token": CSRF})
+import re as _re
+for path in ["/admin/", "/admin/pages", "/admin/posts", "/admin/settings",
+             "/admin/users", "/admin/files", "/admin/comments", "/admin/ssl"]:
+    body = ca.get(path).get_data(as_text=True)
+    m = _re.search(r'data-palette="([a-z]+)"', body)
+    p = m.group(1) if m else "NONE"
+    ok(f"GET {path} 首屏 data-palette 来自 DB(grape) 不是 amber",
+       p == "grape")
+# 切回 amber 防止 e2e 残留污染
+ca.post("/api/site-prefs", json={"color_palette": "amber"},
+        headers={"Content-Type": "application/json", "X-CSRF-Token": CSRF})
+
 
 # ---------------- 8. 侧栏部件 ----------------
 for needle in ["blogger", "motto", "weatherCard", "cdToday", "cdMonth", "cdYear"]:

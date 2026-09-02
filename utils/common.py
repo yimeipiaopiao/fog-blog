@@ -68,18 +68,20 @@ def plain_text(text, is_html=False):
 # ---------------- 站点设置 ----------------
 
 def get_settings():
-    """读取全部设置（带默认值），并做轻量缓存。"""
-    cache = getattr(current_app, "_settings_cache", None)
-    if cache is not None:
-        return cache
+    """读取全部设置（带默认值）。
+
+    不再缓存：站点配色/主题默认值等需要"DB 一改就立刻生效"，任何后台写
+    Settings 表后下一个请求就能拿到新值（之前进程级缓存会导致首屏渲染
+    仍是旧色，依赖前端 async fetch 才覆盖回来）。SQLite 读 < 0.1ms，无负担。
+    """
     data = dict(current_app.config["DEFAULT_SETTINGS"])
     data.update(Setting.get_all())
-    setattr(current_app, "_settings_cache", data)
     return data
 
 
 def invalidate_settings():
-    setattr(current_app, "_settings_cache", None)
+    """保留为 no-op 兼容旧调用点；新版 get_settings 已不缓存。"""
+    return None
 
 
 def get_setting(key, default=""):
