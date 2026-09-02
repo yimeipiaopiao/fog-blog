@@ -251,13 +251,15 @@ with app.app_context():
     sv = {s.key: s.value for s in Setting.query.all()}
     ok("theme_fix_content 落库=1", sv.get("theme_fix_content") == "1")
 
-# 管理员后台页面包含 theme.js / widgets.js / admin-prefs.css
+# 管理员后台页面包含 theme.js / widgets.js + wb-modal
 _dash = ca.get("/admin/").get_data(as_text=True)
 ok("后台 dashboard 渲染 200", _dash and "admin-shell" in _dash)
 ok("后台 dashboard 已移除 prefs-dock（不再有 themeToggle 按钮）",
    'id="themeToggle"' not in _dash)
 ok("后台 dashboard 已移除 paletteToggle 按钮",
    'id="paletteToggle"' not in _dash)
+ok("后台 dashboard 不再引用孤儿 admin-prefs.css（已删除）",
+   "/static/css/admin-prefs.css" not in _dash)
 ok("后台 dashboard 引入 theme.js", "/static/js/theme.js" in _dash)
 ok("后台 dashboard 引入 widgets.js", "/static/js/widgets.js" in _dash)
 ok("后台 dashboard 引入 wb-modal.js（自定义确认弹窗）",
