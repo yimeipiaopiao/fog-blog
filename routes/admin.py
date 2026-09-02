@@ -13,7 +13,7 @@ from sqlalchemy import or_
 from werkzeug.utils import secure_filename
 
 from models import (Category, Comment, File, Friend, Log, Page, Post, Setting,
-                    Tag, User, db)
+                    SSLCertificate, Tag, User, db)
 from utils import (invalidate_settings, login_required, paginate,
                    purge_old_logs, slugify, write_log)
 
@@ -767,4 +767,103 @@ def backup_export():
         mimetype="application/json",
     )
     resp.headers["Content-Disposition"] = f"attachment; filename=posts-export-{datetime.now().strftime('%Y%m%d')}.json"
-    return resp
+
+
+# ---------------- SSL 证书管理 ----------------
+
+import json as _json
+from utils import ssl_manager as _ssl
+
+
+@admin_bp.route("/ssl")
+def ssl_status():
+    """SSL 状态页：显示当前激活证书 + 操作按钮 + 历史。"""
+    from utils.ssl_manager import get_wrapper_status
+
+    active = (SSLCertificate.query.filter_by(is_active=True)
+              .order_by(SSLCertificate.updated_at.desc()).first())
+    history = (SSLCertificate.query
+               .order_by(SSLCertificate.created_at.desc()).limit(20).all())
+    # 服务器侧最新证书状态（如果当前 active 记录存在，调 wrapper status 二次确认）
+    live_status = None
+    if active:
+        out = _ssl._run_wrapper("status", active.domain)
+        if out[0] == 0:
+            try:
+                live_status = _json.loads(out[1])
+            except Exception:
+                pass
+    return render_template(
+        "admin/ssl.html",
+        active=active, history=history, live=live_status,
+        wrapper_meta=get_wrapper_status(),
+    )
+
+
+@admin_bp.route("/ssl/upload", methods=["GET", "POST"])
+def ssl_upload():
+    """上传 / 更新证书。表单提交后调 wrapper 应用。"""
+    if request.method == "POST":
+        domain = (request.form.get("domain") or "").strip()
+        cert_pem = request.form.get("cert_pem") or ""
+        key_pem = request.form.get("key_pem") or ""
+        if not domain or not cert_pem or not key_pem:
+            flash("域名、证书、私钥均不能为空", "error")
+            return redirect(url_for("admin.ssl_upload"))
+        try:
+            info = _ssl.process_upload(domain, cert_pem, key_pem)
+        except (ValueError, RuntimeError) as e:
+            flash(str(e), "error")
+            return render_template("admin/ssl_upload.html", domain=domain)
+        # 写入数据库：旧 active 设为 False、新行设为 True
+        try:
+            SSLCertificate.query.filter_by(is_active=True).update(
+                {"is_active": False}, synchronize_session=False
+            )
+            import json as _j
+            rec = SSLCertificate(
+                domain=info["domain"],
+                cert_path=info["cert_path"],
+                key_path=info["key_path"],
+                issuer=info["issuer"],
+                subject=info["subject"],
+                sans=_j.dumps(info["sans"], ensure_ascii=False),
+                not_before=info["not_before"],
+                not_after=info["not_after"],
+                is_active=True,
+                created_by=session_user(),
+            )
+            db.session.add(rec)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            flash(f"证书已生效但数据库记录失败：{e}", "error")
+            return redirect(url_for("admin.ssl_status"))
+        write_log("ssl_apply", f"部署证书：{info['domain']}",
+                  f"{info['issuer']}  SAN={','.join(info['sans'][:3])}{'...' if len(info['sans'])>3 else ''}",
+                  username=session_user())
+        flash(f"证书已生效：{info['domain']}（过期时间 {info['not_after'].strftime('%Y-%m-%d')}）", "success")
+        return redirect(url_for("admin.ssl_status"))
+    return render_template("admin/ssl_upload.html", domain="")
+
+
+@admin_bp.route("/ssl/delete", methods=["POST"])
+def ssl_delete():
+    """停用 HTTPS：移除 nginx https 配置 + 回到 HTTP。"""
+    domain = (request.form.get("domain") or "").strip()
+    if not domain:
+        flash("缺少域名参数", "error")
+        return redirect(url_for("admin.ssl_status"))
+    try:
+        _ssl.remove_certificate(domain)
+    except RuntimeError as e:
+        flash(str(e), "error")
+        return redirect(url_for("admin.ssl_status"))
+    SSLCertificate.query.filter_by(domain=domain, is_active=True).update(
+        {"is_active": False}, synchronize_session=False
+    )
+    db.session.commit()
+    write_log("ssl_remove", f"停用 HTTPS：{domain}", "", username=session_user())
+    flash(f"HTTPS 已停用：{domain}（如需 HTTP 服务请确保 /etc/nginx/sites-enabled/blog.conf 仍可用）",
+          "success")
+    return redirect(url_for("admin.ssl_status"))

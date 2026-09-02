@@ -215,3 +215,52 @@ class Friend(db.Model):
     is_show = db.Column(db.Boolean, default=True)
     order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.now)
+
+
+class SSLCertificate(db.Model):
+    """SSL 证书历史与当前状态（后台 SSL 上传功能的元数据记录）。
+
+    实际证书文件落在服务器 /etc/nginx/ssl/<domain>/ 下，由 wrapper 脚本管理。
+    本表只跟踪元数据：签发者、SAN、有效期、操作人等，供状态页与历史页展示。
+    """
+    __tablename__ = "ssl_certificate"
+    id = db.Column(db.Integer, primary_key=True)
+    domain = db.Column(db.String(255), nullable=False, index=True)
+    cert_path = db.Column(db.String(512), nullable=False)
+    key_path = db.Column(db.String(512), nullable=False)
+    issuer = db.Column(db.String(255), default="")
+    subject = db.Column(db.String(255), default="")
+    sans = db.Column(db.Text, default="")          # JSON 列表字符串，覆盖的所有域名
+    not_before = db.Column(db.DateTime, nullable=True)
+    not_after = db.Column(db.DateTime, nullable=True, index=True)
+    is_active = db.Column(db.Boolean, default=True)  # 当前是否被 nginx 加载
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    created_by = db.Column(db.String(64), default="")
+
+    @property
+    def sans_list(self):
+        try:
+            import json
+            return json.loads(self.sans or "[]")
+        except Exception:
+            return []
+
+    @property
+    def days_to_expire(self):
+        if not self.not_after:
+            return None
+        from datetime import datetime
+        delta = self.not_after - datetime.utcnow()
+        return int(delta.total_seconds() // 86400)
+
+    @property
+    def status_label(self):
+        """证书状态：未生效 / 正常 / 即将过期（30 天内）/ 已过期。"""
+        if self.days_to_expire is None:
+            return "未知"
+        if self.days_to_expire < 0:
+            return f"已过期 {-self.days_to_expire} 天"
+        if self.days_to_expire < 30:
+            return f"即将过期（{self.days_to_expire} 天）"
+        return "正常"

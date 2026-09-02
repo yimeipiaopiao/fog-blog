@@ -88,8 +88,34 @@ warn "需要编辑 /etc/nginx/sites-available/$SERVICE_NAME.conf 把 server_name
 warn "改完后执行: ln -sf /etc/nginx/sites-available/$SERVICE_NAME.conf /etc/nginx/sites-enabled/"
 warn "然后: nginx -t && systemctl reload nginx"
 
-# ---------- 初始化数据库 ----------
-log "初始化数据库（创建表）"
+# ---------- SSL 部署（sudo wrapper + sudoers + nginx 通用参数片段）----------
+log "部署 SSL 上传 wrapper（sudo 限定 www-data 无密码执行）"
+cp "$APP_DIR/deploy/scripts/blog-ssl-apply.sh" /usr/local/bin/blog-ssl-apply
+chmod 750 /usr/local/bin/blog-ssl-apply
+chown root:www-data /usr/local/bin/blog-ssl-apply
+
+# sudoers：仅允许 www-data 跑这一个 wrapper，不允许其他 root 命令
+SUDOERS_FILE="/etc/sudoers.d/blog-ssl"
+cat > "$SUDOERS_FILE" <<'SUDO_EOF'
+Cmnd_Alias BLOG_SSL = /usr/local/bin/blog-ssl-apply
+www-data ALL=(root) NOPASSWD: BLOG_SSL
+SUDO_EOF
+chmod 440 "$SUDOERS_FILE"
+visudo -c -f "$SUDOERS_FILE" || die "sudoers 配置有语法错误，请检查 $SUDOERS_FILE"
+log "sudoers 配置完成：$SUDOERS_FILE"
+
+# nginx SSL 通用参数片段（写证书时由 wrapper include 进 server block）
+mkdir -p /etc/blog
+cp "$APP_DIR/deploy/nginx-ssl-params.conf" /etc/blog/nginx-ssl-params.conf
+chmod 644 /etc/blog/nginx-ssl-params.conf
+
+# 证书目录（www-data 没写权限，但 wrapper 走 root → 正常）
+mkdir -p /etc/nginx/ssl
+chmod 755 /etc/nginx/ssl
+log "SSL 目录 /etc/nginx/ssl 已就绪"
+
+# 初始化数据库时新建 SSLCertificate 表
+log "初始化数据库（创建表，含 SSLCertificate）"
 sudo -u www-data "$APP_DIR/venv/bin/python" -c "from app import app, db; app.app_context().push(); db.create_all()"
 log "数据库表已创建"
 
@@ -107,8 +133,11 @@ cat <<'EOF'
 ║       nginx -t && systemctl reload nginx                   ║
 ║  3. 启动博客：                                            ║
 ║       systemctl start blog                                ║
-║  4. 配 HTTPS（推荐 certbot 自动）：                         ║
-║       certbot --nginx -d blog.example.com                 ║
+║  4. 配 HTTPS（两种方式）：                                  ║
+║     A. 后台「SSL 证书」上传 PEM（已部署 wrapper）：         ║
+║         在 https://example.com/admin/ssl 上传即可          ║
+║     B. 手动 certbot 自动：                                 ║
+║         certbot --nginx -d example.com                   ║
 ║  5. （可选）插入演示数据：                                 ║
 ║       sudo -u www-data venv/bin/python seed.py            ║
 ║                                                          ║

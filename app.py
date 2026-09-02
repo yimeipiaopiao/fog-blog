@@ -3,6 +3,7 @@ from datetime import datetime
 
 import click
 from flask import Flask, current_app, render_template, send_from_directory
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
 from models import Setting, User, db
@@ -11,6 +12,10 @@ from models import Setting, User, db
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    # nginx 终结 TLS 后反代到 127.0.0.1:8000 —— 让 Flask 感知 https 协议
+    # 与真实客户端 IP（生产仅本机监听，不会被伪造头欺骗）
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     os.makedirs(app.config["BACKUP_FOLDER"], exist_ok=True)

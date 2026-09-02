@@ -39,6 +39,7 @@
         <a href="{{ url_for('admin.users') }}" class="{{ 'active' if request.endpoint in ['admin.users', 'admin.user_new', 'admin.user_toggle', 'admin.user_delete', 'admin.user_reset'] }}"><span class="dot"></span><span>用户管理</span></a>
         <a href="{{ url_for('admin.logs') }}" class="{{ 'active' if request.endpoint in ['admin.logs', 'admin.logs_purge', 'admin.logs_clear'] }}"><span class="dot"></span><span>操作日志</span></a>
         <a href="{{ url_for('admin.settings') }}"><span class="dot"></span><span>站点设置</span></a>
+        <a href="{{ url_for('admin.ssl_status') }}" class="{{ 'active' if request.endpoint in ['admin.ssl_status', 'admin.ssl_upload', 'admin.ssl_delete'] }}"><span class="dot"></span><span>SSL 证书</span></a>
         <a href="{{ url_for('admin.backup') }}"><span class="dot"></span><span>备份与导出</span></a>
         <a href="{{ url_for('main.index') }}" target="_blank"><span class="dot"></span><span>查看前台</span></a>
         <a href="{{ url_for('auth.logout') }}"><span class="dot"></span><span>退出登录</span></a>

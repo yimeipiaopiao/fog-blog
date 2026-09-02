@@ -65,7 +65,7 @@ for p in ["/admin/", "/admin/posts", "/admin/posts/1/edit", "/admin/posts/new",
           "/admin/pages", "/admin/pages/1/edit", "/admin/friends",
           "/admin/files", "/admin/settings", "/admin/backup",
           "/admin/users", "/admin/logs",
-          "/admin/pdf/new"]:
+          "/admin/pdf/new", "/admin/ssl", "/admin/ssl/upload"]:
     st, _ = get(p)
     check(p, st)
 

@@ -15,9 +15,13 @@ import io
 import struct
 import zlib
 
+# SSL 上传功能走 DRY_RUN：本机没有 wrapper / nginx，跳过实际写盘与 reload
+os.environ["BLOG_SSL_DRY_RUN"] = "1"
+
 from config import Config
 from app import create_app
-from models import Category, Comment, File, Log, Post, Setting, User, db
+from models import (Category, Comment, File, Log, Post, Setting, SSLCertificate,
+                    User, db)
 
 # ---- 独立临时库 ----
 _tmpdir = tempfile.mkdtemp(prefix="blog_e2e_")
@@ -372,6 +376,120 @@ r = gnick.get("/static/vendor/pdfjs/pdf.min.js")
 ok("PDF.js 主脚本 200", r.status_code == 200)
 r = gnick.get("/static/vendor/pdfjs/pdf.worker.min.js")
 ok("PDF.js worker 200", r.status_code == 200)
+
+
+# ---------------- 13. SSL 证书上传（DRY_RUN 下完整回归） ----------------
+from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
+
+
+def _make_cert(domains, days=365, shift=0):
+    """生成本地自签证书，返回 (cert_pem, key_pem)。
+    整窗平移：not_before=now+shift-1d, not_after=now+shift+days。
+    shift<0 → 已过期；shift>0 → 尚未生效。"""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = _dt.now(_tz.utc)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, domains[0])])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now + _td(days=shift - 1))
+        .not_valid_after(now + _td(days=shift + days))
+        .add_extension(x509.SubjectAlternativeName(
+            [x509.DNSName(d) for d in domains]), critical=False)
+        .sign(key, hashes.SHA256())
+    )
+    cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode()
+    key_pem = key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption()).decode()
+    return cert_pem, key_pem
+
+
+def _ssl_upload(c, domain, cert_pem, key_pem):
+    return c.post("/admin/ssl/upload", data={**csrf(), "domain": domain,
+        "cert_pem": cert_pem, "key_pem": key_pem}, follow_redirects=False)
+
+
+# 状态页 / 上传页可达 + DRY_RUN 提示
+r = ca.get("/admin/ssl")
+ok("GET /admin/ssl 200", r.status_code == 200)
+ok("状态页含 DRY-RUN 开发模式提示", "DRY-RUN" in r.get_data(as_text=True))
+r = ca.get("/admin/ssl/upload")
+ok("GET /admin/ssl/upload 200 含表单", r.status_code == 200
+   and "上传 / 更新 SSL 证书" in r.get_data(as_text=True))
+
+# 配对证书上传成功（DRY_RUN 不写盘，但入库元数据）
+cert_ok, key_ok = _make_cert(["blog.example.com", "erp.example.com"], days=365)
+r = _ssl_upload(ca, "blog.example.com", cert_ok, key_ok)
+ok("上传配对证书 -> 302 回状态页",
+   r.status_code == 302 and r.headers.get("Location", "").endswith("/admin/ssl"))
+with app.app_context():
+    sc = (SSLCertificate.query.filter_by(domain="blog.example.com", is_active=True)
+          .order_by(SSLCertificate.id.desc()).first())
+    ok("成功证书入库 is_active=True", sc is not None)
+    ok("入库 SAN 含 blog 与 erp", sc is not None
+       and "blog.example.com" in sc.sans_list and "erp.example.com" in sc.sans_list)
+    SC_ID = sc.id if sc else -1
+
+# 换一张新证书更新（老记录被置为不激活）
+cert_ok2, key_ok2 = _make_cert(["blog.example.com"], days=400)
+r = _ssl_upload(ca, "blog.example.com", cert_ok2, key_ok2)
+ok("更新证书 -> 302", r.status_code == 302)
+with app.app_context():
+    n_active = SSLCertificate.query.filter_by(domain="blog.example.com",
+                                              is_active=True).count()
+    old = SSLCertificate.query.get(SC_ID)
+    ok("更新后旧证书 is_active=False、仅 1 条 active", old is not None
+       and not old.is_active and n_active == 1)
+
+# 负向：密钥不匹配
+certA, keyA = _make_cert(["blog.example.com"])
+certB, keyB = _make_cert(["blog.example.com"])
+r = _ssl_upload(ca, "blog.example.com", certA, keyB)
+ok("私钥不匹配被拒(提示不匹配)",
+   r.status_code == 200 and "不匹配" in r.get_data(as_text=True))
+
+# 负向：域名不在证书 SAN
+r = _ssl_upload(ca, "other-site.com", cert_ok, key_ok)
+ok("域名不在 SAN 被拒", r.status_code == 200
+   and "不在证书覆盖范围" in r.get_data(as_text=True))
+
+# 负向：已过期 / 尚未生效
+cexp, kexp = _make_cert(["blog.example.com"], days=30, shift=-60)
+r = _ssl_upload(ca, "blog.example.com", cexp, kexp)
+ok("过期证书被拒(提示已过期)", r.status_code == 200 and "过期" in r.get_data(as_text=True))
+cfut, kfut = _make_cert(["blog.example.com"], days=90, shift=15)
+r = _ssl_upload(ca, "blog.example.com", cfut, kfut)
+ok("未生效证书被拒(提示尚未生效)",
+   r.status_code == 200 and "尚未生效" in r.get_data(as_text=True))
+
+# 负向：非 PEM 垃圾输入 / 缺字段
+r = _ssl_upload(ca, "blog.example.com", "not a pem at all", key_ok)
+ok("垃圾证书文本被拒", r.status_code == 200
+   and ("格式错误" in r.get_data(as_text=True) or "解析失败" in r.get_data(as_text=True)))
+r = ca.post("/admin/ssl/upload", data={**csrf(), "domain": "", "cert_pem": "", "key_pem": ""},
+            follow_redirects=False)
+ok("空表单被拒(302 回上传页)", r.status_code == 302)
+with app.app_context():
+    ok("负向用例全部未入库", SSLCertificate.query.filter_by(domain="other-site.com").count() == 0
+       and SSLCertificate.query.count() <= 3)
+
+# 停用 HTTPS（删除）
+r = ca.post("/admin/ssl/delete", data={**csrf(), "domain": "blog.example.com"},
+            follow_redirects=False)
+ok("POST /admin/ssl/delete -> 302", r.status_code == 302)
+with app.app_context():
+    sc3 = SSLCertificate.query.get(SC_ID)
+    ok("删除后无 active 记录", sc3 is not None and not sc3.is_active
+       and SSLCertificate.query.filter_by(is_active=True).count() == 0)
 
 
 # ---- 收尾 ----
