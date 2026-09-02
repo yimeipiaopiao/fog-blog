@@ -171,6 +171,9 @@ flask --app app create-user admin 新密码   # 已存在则提示，可先删�
 **Q: 换主色调？**
 后台「站点设置 → 外观配色」下拉切换 5 套配色（amber 默认）。定义在 `static/css/palette.css`，可复制 block 自定义。访客也可在前台导航「调色板」按钮自选（存 localStorage，不影响他人）。
 
+**Q: 想要动漫壁纸做博客背景（毛玻璃透出背景图）？**
+后台「站点设置 → 自定义背景图」：粘贴图片 URL 或点「上传图片」直接传本地壁纸（jpg/png/webp/gif），再用滑杆调背景图透明度（5-100%，默认 45）。保存后前台全屏铺图：文章卡片 / 导航 / 页脚仍是毛玻璃，背景图从玻璃后透出；越淡越素净利阅读、越浓玻璃透出的图越明显。留空即恢复默认渐变底 + 漂浮光斑。设置项：`site_bg_image` / `site_bg_opacity`。
+
 ## 技术栈
 
 Flask 3 · Flask-SQLAlchemy · SQLite · python-markdown · Gunicorn · Nginx · 原生 HTML/CSS/JS · marked.js · Turndown.js · highlight.js · PDF.js
