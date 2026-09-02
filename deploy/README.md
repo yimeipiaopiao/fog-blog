@@ -20,7 +20,7 @@
 
 ```bash
 # 1. 克隆代码
-git clone <你的仓库地址> /var/www/blog
+git clone https://github.com/yimeipiaopiao/fog-blog.git /var/www/blog
 cd /var/www/blog
 
 # 2. 生成生产密钥

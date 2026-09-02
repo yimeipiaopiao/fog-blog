@@ -1,5 +1,7 @@
 # 雾里博客 · 毛玻璃风格轻量博客
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/) [![Flask](https://img.shields.io/badge/Flask-3.x-black.svg)](https://flask.palletsprojects.com/)
+
 基于 **Flask + SQLite** 的轻量博客系统，前台采用半透明毛玻璃（Glassmorphism）设计，自带完整管理后台。零外部 CDN 依赖、单文件数据库、原生 HTML/CSS/JS，2G 内存小服务器即可流畅运行。
 
 ## 功能一览
@@ -81,7 +83,7 @@ blog/
 
 > **推荐使用自带的一键部署包**，详见 [`deploy/README.md`](deploy/README.md)：
 > ```bash
-> git clone <你的仓库地址> /var/www/blog
+> git clone https://github.com/yimeipiaopiao/fog-blog.git /var/www/blog
 > cd /var/www/blog
 > sudo bash deploy/install.sh    # 自动：venv + 依赖 + 随机 SECRET_KEY + systemd + Nginx
 > ```
