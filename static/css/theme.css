@@ -17,6 +17,7 @@ html[data-theme="dark"] {
   --glass-bg-strong: rgba(45, 36, 26, 0.85);
   --glass-border: rgba(255, 215, 160, 0.14);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --bg-veil: rgba(13, 11, 9, 0.5);  /* 自定义背景图上的深色 veil（保文字可读） */
 }
 html[data-theme="dark"] body {
   background: var(--page-bg-dark, linear-gradient(160deg, #171310 0%, #1e1712 45%, #251a10 100%));

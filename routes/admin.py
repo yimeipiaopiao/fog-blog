@@ -713,6 +713,12 @@ def settings():
                 Setting.set(key, (request.form.get(key) or "").strip())
                 changed += 1
             # 表单未提交的其它键：保持原值不清空
+        # 背景图透明度约束在 5-100（防手改库/异常值）
+        try:
+            _op = min(100, max(5, int(request.form.get("site_bg_opacity", "45"))))
+        except (TypeError, ValueError):
+            _op = 45
+        Setting.set("site_bg_opacity", str(_op))
         db.session.commit()
         invalidate_settings()
         write_log("settings_save", "更新站点设置", f"共 {changed} 项", username=session_user())

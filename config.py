@@ -59,6 +59,9 @@ class Config:
         # ---- 配色方案（毛玻璃主色调）----
         # amber=焦糖琥珀(默认) / sea=海盐蓝 / mint=抹茶青 / grape=葡萄紫 / rose=蔷薇粉
         "color_palette": "amber",
+        # ---- 自定义背景图（前台毛玻璃底图；留空=默认渐变底+光斑）----
+        "site_bg_image": "",      # 图片 URL：/uploads/image/xxx.jpg 或 https://…
+        "site_bg_opacity": "35",  # 图片不透明度 5-100（越小越淡，越大毛玻璃透出的图越清晰）
         # ---- 天气（免费接口，IP 定位，失败自动隐藏）----
         "weather_default_city": "",
         # ---- 日志自动清理（天）----

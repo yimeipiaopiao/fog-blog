@@ -290,3 +290,17 @@ table.data tr:hover td { background: rgba(var(--primary-rgb), 0.05); }
 .f-op-btn:hover { color: var(--primary); border-color: rgba(var(--primary-rgb), 0.5); background: rgba(var(--primary-rgb), 0.05); }
 .f-op-btn.del:hover { color: #d14a2e; border-color: rgba(209, 74, 46, 0.5); background: rgba(209, 74, 46, 0.05); }
 .files-empty { text-align: center; color: var(--text-3); padding: 70px 0; font-size: 14px; }
+
+/* ---------- 站点设置 · 自定义背景图 ---------- */
+.bg-setup-row { display: flex; gap: 10px; align-items: center; }
+.bg-setup-row input[type="text"] { flex: 1; min-width: 0; }
+.bg-preview {
+  margin-top: 10px; border: 1px dashed rgba(164, 134, 96, 0.4); border-radius: var(--radius-sm);
+  min-height: 96px; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  background: rgba(146, 100, 46, 0.04);
+}
+.bg-preview img { width: 100%; height: 180px; object-fit: cover; object-position: center top; display: block; }
+.bg-preview.empty { background-image: repeating-linear-gradient(45deg, rgba(146, 100, 46, 0.05) 0 10px, transparent 10px 20px); }
+.bg-preview.empty::after { content: "暂无背景图 · 站点使用默认渐变底 + 漂浮光斑"; color: var(--text-3); font-size: 12px; }
+.bg-op-row { display: flex; gap: 12px; align-items: center; margin-top: 4px; }
+.bg-op-row input[type="range"] { flex: 1; accent-color: var(--primary); }

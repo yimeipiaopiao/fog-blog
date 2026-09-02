@@ -21,7 +21,9 @@
   --page-bg: linear-gradient(160deg, #fdf3e7 0%, #fbead6 45%, #fbe3d0 100%);
   --orb-1: #ffc873;
   --orb-2: #ffd9a0;
-  --orb-3: #ffb290;}
+  --orb-3: #ffb290;
+  /* 自定义背景图启用时盖在图上、保证文字可读的浅色 veil */
+  --bg-veil: rgba(250, 246, 239, 0.28);}
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -55,6 +57,44 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .bg-orbs i { animation: none; }
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* ---------- 自定义背景图（后台「站点设置 → 自定义背景图」） ----------
+   层级自下而上：body 渐变底色 → .bg-photo(背景图 + 主题色 veil) → 毛玻璃内容；
+   启用后隐藏漂浮光斑，玻璃卡片会把这张图模糊透出 = 毛玻璃背景图。
+   图的 URL / 不透明度由 body 上的 --bg-photo-bg / --bg-photo-opacity 注入 */
+.bg-photo {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-repeat: no-repeat; background-position: center; background-size: cover;
+  background-image: var(--bg-photo-bg, none);
+  opacity: var(--bg-photo-opacity, 0.45);
+  transition: opacity 0.3s ease;
+}
+.bg-photo::after { /* veil：图上再淡，文字也要可读 */
+  content: ""; position: absolute; inset: 0;
+  background: var(--bg-veil, rgba(250, 246, 239, 0.28));
+}
+body.has-bg-photo .bg-orbs { display: none; }
+/* 露底的 hero / footer 自动套上毛玻璃，与整站玻璃语言统一，同时保证图上文字对比度 */
+body.has-bg-photo .hero {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--glass-shadow);
+  max-width: calc(var(--max-w) - 40px);
+  margin: 22px auto 0; padding: 36px 26px 24px;
+}
+body.has-bg-photo .footer { padding: 0 0 8px; }
+body.has-bg-photo .footer .container {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--glass-shadow);
+  padding: 14px 20px;
 }
 
 /* 通用毛玻璃容器（blur 半径适度，兼顾效果与合成成本） */

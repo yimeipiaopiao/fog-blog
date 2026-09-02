@@ -492,6 +492,48 @@ with app.app_context():
        and SSLCertificate.query.filter_by(is_active=True).count() == 0)
 
 
+# ---------------- 自定义背景图（前台毛玻璃背景图） ----------------
+# 后台设置页包含控件
+r = ca.get("/admin/settings")
+_h = r.get_data(as_text=True)
+ok("后台设置页含背景图输入框/滑杆/上传按钮",
+   'id="bgImgInput"' in _h and 'id="bgOpacity"' in _h and 'id="bgFileBtn"' in _h)
+
+# 设置图片 + 透明度 → 首页 body 注入 CSS 变量、渲染背景层、光斑隐藏
+r = ca.post("/admin/settings", data={**csrf(), "site_bg_image": "/uploads/image/wallpaper.jpg",
+                                     "site_bg_opacity": "70"}, follow_redirects=False)
+ok("保存背景图设置 -> 302", r.status_code == 302)
+r = app.test_client().get("/")
+_h = r.get_data(as_text=True)
+ok("前台首页启用 has-bg-photo 与 .bg-photo 层",
+   'class="has-bg-photo"' in _h and 'class="bg-photo"' in _h)
+ok("背景图 URL 已安全写入 CSS 变量",
+   "--bg-photo-bg: url(/uploads/image/wallpaper.jpg)" in _h)
+ok("透明度 70 正确注入", "--bg-photo-opacity: 0.7" in _h)
+ok("设置页回显当前值", 'value="/uploads/image/wallpaper.jpg"' in
+   ca.get("/admin/settings").get_data(as_text=True))
+
+# 透明度越界被 clamp（100 / 非法回 45）
+def _bg_op_value():
+    with app.app_context():
+        s = Setting.query.filter_by(key="site_bg_opacity").first()
+        return s.value if s else None
+
+r = ca.post("/admin/settings", data={**csrf(), "site_bg_image": "/uploads/image/wallpaper.jpg",
+                                     "site_bg_opacity": "999"}, follow_redirects=False)
+ok("透明度 999 被 clamp 为 100", _bg_op_value() == "100")
+r = ca.post("/admin/settings", data={**csrf(), "site_bg_image": "/uploads/image/wallpaper.jpg",
+                                     "site_bg_opacity": "abc"}, follow_redirects=False)
+ok("透明度非法值回退 45", _bg_op_value() == "45")
+
+# 清空图片 → 前台恢复默认（无背景层）
+r = ca.post("/admin/settings", data={**csrf(), "site_bg_image": "",
+                                     "site_bg_opacity": "45"}, follow_redirects=False)
+_h = app.test_client().get("/").get_data(as_text=True)
+ok("清空背景图后前台恢复正常渐变底",
+   'class="has-bg-photo"' not in _h and 'class="bg-photo"' not in _h)
+
+
 # ---- 收尾 ----
 print()
 if failures:

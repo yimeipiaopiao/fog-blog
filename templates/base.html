@@ -50,7 +50,11 @@
   </script>
   {% block head %}{% endblock %}
 </head>
-<body>
+<body{% if SITE.site_bg_image %}
+  class="has-bg-photo"
+  style="--bg-photo-bg: {{ SITE.site_bg_image | css_url }}; --bg-photo-opacity: {{ (((SITE.site_bg_opacity or 45) | int) / 100) | round(2) }};"
+{% endif %}>
+  {% if SITE.site_bg_image %}<div class="bg-photo" aria-hidden="true"></div>{% endif %}
   <div class="bg-orbs"><i></i><i></i><i></i></div>
   <div class="progress-bar" id="progressBar"></div>
 

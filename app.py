@@ -44,6 +44,19 @@ def create_app(config_class=Config):
             "is_logged_in": current_user() is not None,
         }
 
+    @app.template_filter("css_url")
+    def css_url(u):
+        """把站点设置的图片 URL 安全转成 CSS url(裸token) 形式。
+
+        URL 中除 URL 骨架字符外的特殊字符全部 percent 编码（引号/空格/括号等），
+        因此输出不引号的 url(...) 也安全；同时避免模板自动转义把引号变实体。"""
+        from urllib.parse import quote
+
+        s = (u or "").strip()
+        if not s:
+            return "none"
+        return "url(" + quote(s, safe="/:?&=._~%#+@-") + ")"
+
     @app.errorhandler(404)
     def not_found(e):
         return render_template("404.html"), 404
