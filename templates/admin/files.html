@@ -165,8 +165,10 @@
 
   document.querySelectorAll("[data-del]").forEach(function (btn) {
     btn.addEventListener("click", function () {
+      /* 等待 wb-modal.js 拦截 → 弹中央 modal → 用户点确定后设 btn.__wbModalSkip=true
+         然后 wb-modal 调 btn.click() 重新派发 → 这次本 listener 放行执行删除 */
+      if (!btn.__wbModalSkip) return;
       var item = btn.closest(".file-item");
-      if (!confirm(btn.dataset.confirmMsg || "确定删除该文件？")) return;
       var id = item.dataset.id;
       var fd = new FormData();
       fd.append("csrf_token", CSRF);

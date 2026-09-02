@@ -883,6 +883,17 @@ ok("开屏光晕动效升级(闪烁/流光/呼吸/辉光)",
    and "conic-gradient" in _css and "splash-dash-flicker" in _css
    and "splash-halo-pulse" in _css)
 
+# ---------------- 14. 文件库删除按钮已改用 wb-modal 接管 ----------------
+_files_html = ca.get("/admin/files").get_data(as_text=True)
+ok("/admin/files 渲染 200", _files_html and "dropZone" in _files_html)
+ok("/admin/files 含 data-confirm-msg 删除按钮（wb-modal 接管点）",
+   'data-confirm-msg="确定删除' in _files_html)
+ok("/admin/files 模板已不再使用原生 confirm() 调用",
+   "confirm(" not in _files_html.replace("\n", " "))
+ok("/admin/files data-del 走 wbModalSkip 守卫逻辑",
+   "__wbModalSkip" in _files_html)
+
+
 # ---- 收尾 ----
 print()
 if failures:
