@@ -109,6 +109,7 @@ class Post(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     published_at = db.Column(db.DateTime, default=datetime.now)
+    deleted_at = db.Column(db.DateTime, nullable=True)  # 回收站时间戳，NULL=正常，非 NULL=已删除
 
     category = db.relationship("Category", back_populates="posts")
     tags = db.relationship("Tag", secondary=post_tags, back_populates="posts")

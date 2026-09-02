@@ -133,6 +133,37 @@ table.data tr:hover td { background: rgba(var(--primary-rgb), 0.05); }
 .btn.danger-ghost:hover { background: rgba(209, 74, 46, 0.07); color: #d14a2e; }
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* 文章管理：批量操作工具栏 + 行内勾选框 */
+.batch-bar {
+  display: flex; gap: 10px; align-items: center;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: var(--glass-bg-soft, rgba(255, 252, 246, 0.7));
+  border: 1px solid var(--glass-border, rgba(180, 170, 155, 0.3));
+  border-radius: 10px;
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.06);
+}
+.batch-bar[hidden] { display: none; }
+.batch-count {
+  font-size: 13px; font-weight: 600; color: var(--primary, #d18a4d);
+  padding: 4px 10px;
+  background: rgba(209, 138, 77, 0.1);
+  border-radius: 6px;
+}
+.batch-bar form { margin: 0; display: inline-flex; }
+.batch-check {
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  width: 20px; height: 20px;
+}
+.batch-check input[type="checkbox"] {
+  width: 16px; height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary, #d18a4d);
+}
+
 /* 表单 */
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
 .form-item { margin-bottom: 16px; }

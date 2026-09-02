@@ -34,12 +34,14 @@ def create_app(config_class=Config):
     # 站点设置缓存失效：后台修改后调用 invalidate_settings()
     @app.context_processor
     def inject_globals():
+        from datetime import datetime
         from utils import current_user, generate_csrf_token, get_settings
 
         return {
             "SITE": get_settings(),
             "csrf_token": generate_csrf_token,
             "now": datetime.now,
+            "datetime": datetime,
             "auth_user": current_user(),
             "is_logged_in": current_user() is not None,
         }
@@ -112,6 +114,7 @@ def register_cli(app):
                     ("content_html", "TEXT"),
                     ("allow_comment", "BOOLEAN DEFAULT 1"),
                     ("pdf_url", "VARCHAR(255) DEFAULT ''"),
+                    ("deleted_at", "DATETIME"),
                 ],
                 "page": [
                     ("render_mode", "VARCHAR(16) DEFAULT 'markdown'"),

@@ -254,13 +254,15 @@ with app.app_context():
 # 管理员后台页面包含 theme.js / widgets.js / admin-prefs.css
 _dash = ca.get("/admin/").get_data(as_text=True)
 ok("后台 dashboard 渲染 200", _dash and "admin-shell" in _dash)
-ok("后台 dashboard 含 themeToggle 按钮", 'id="themeToggle"' in _dash)
-ok("后台 dashboard 含 paletteToggle 按钮", 'id="paletteToggle"' in _dash)
+ok("后台 dashboard 已移除 prefs-dock（不再有 themeToggle 按钮）",
+   'id="themeToggle"' not in _dash)
+ok("后台 dashboard 已移除 paletteToggle 按钮",
+   'id="paletteToggle"' not in _dash)
 ok("后台 dashboard 引入 theme.js", "/static/js/theme.js" in _dash)
 ok("后台 dashboard 引入 widgets.js", "/static/js/widgets.js" in _dash)
-ok("后台 dashboard 引入 admin-prefs.css", "/static/css/admin-prefs.css" in _dash)
-ok("后台 dashboard 含 isAdmin 标记",
-   "isAdmin" in _dash or 'data-default-palette' in _dash)
+ok("后台 dashboard 引入 wb-modal.js（自定义确认弹窗）",
+   "/static/js/wb-modal.js" in _dash)
+ok("后台 dashboard 引入 wb-modal.css", "/static/css/wb-modal.css" in _dash)
 
 # 前台访客页面：仍使用 widgets/theme（isAdmin=空，不写 DB）
 _pf = app.test_client().get("/").get_data(as_text=True)
@@ -331,16 +333,105 @@ ca.post("/api/site-prefs",
         headers={"Content-Type": "application/json", "X-CSRF-Token": CSRF})
 
 
-# ---------------- 7.3 后台不再有 .admin-topbar 整个横栏 ----------------
+# ---------------- 7.3 后台不再有 .admin-topbar 整个横栏 + 已移除 prefs-dock ----------------
 _dash = ca.get("/admin/").get_data(as_text=True)
 ok("后台不再渲染 .admin-topbar 横栏",
    'class="admin-topbar"' not in _dash)
-ok("后台渲染左侧底部 .prefs-dock 双按钮",
-   'class="prefs-dock"' in _dash)
-ok(".prefs-dock 内含 #themeToggle 与 #paletteToggle",
-   'class="prefs-dock"' in _dash and
-   'id="themeToggle"' in _dash and
-   'id="paletteToggle"' in _dash)
+ok("后台不再渲染 .prefs-dock（配色/深浅色切换器已移除）",
+   'class="prefs-dock"' not in _dash)
+ok("后台不再有 #themeToggle 按钮",
+   'id="themeToggle"' not in _dash)
+ok("后台不再有 #paletteToggle 按钮",
+   'id="paletteToggle"' not in _dash)
+
+
+# ---------------- 7.4 回收站 + 批量管理 ----------------
+from datetime import datetime, timedelta
+import uuid as _uuid
+with app.app_context():
+    def _mkpost(title, status="published"):
+        slug = "e2e-trash-" + _uuid.uuid4().hex[:8]
+        r = ca.post("/admin/posts/new", data={**csrf(), "title": title, "slug": slug,
+                                                "content": "测试内容", "render_mode": "markdown",
+                                                "status": status, "allow_comment": "1"})
+        return Post.query.filter_by(slug=slug).first()
+
+    p1, p2, p3 = _mkpost("e2e trash 1"), _mkpost("e2e trash 2"), _mkpost("e2e trash 3")
+    ok("创建 3 篇测试文章", all([p1, p2, p3]))
+
+    # 软删除 p1（单篇）
+    r = ca.post(f"/admin/posts/{p1.id}/delete", data=csrf(), follow_redirects=False)
+    ok("POST /admin/posts/<id>/delete 移入回收站 -> 302", r.status_code == 302)
+    _p = Post.query.get(p1.id)
+    ok("p1.deleted_at 不为空（软删除成功）", _p.deleted_at is not None)
+
+    # 列表页不再看到 p1（默认 view=active 过滤掉）
+    _active_html = ca.get("/admin/posts").get_data(as_text=True)
+    ok("/admin/posts 默认不显示已删除文章",
+       "e2e trash 1" not in _active_html and "e2e trash 2" in _active_html)
+
+    # 回收站视图显示 p1
+    _trash_html = ca.get("/admin/posts/trash").get_data(as_text=True)
+    ok("/admin/posts/trash 显示已删除文章",
+       "e2e trash 1" in _trash_html)
+    ok("/admin/posts/trash 显示 \"删除时间\" 列",
+       "删除时间" in _trash_html)
+    ok("/admin/posts/trash 提供\"立即清理过期\"按钮",
+       "立即清理过期" in _trash_html)
+
+    # 批量勾选删除
+    r = ca.post("/admin/posts/batch", data={**csrf(), "action": "delete",
+                                              "ids": [str(p2.id), str(p3.id)]},
+                 follow_redirects=False)
+    ok("POST /admin/posts/batch action=delete 批量移入回收站 -> 302",
+       r.status_code == 302)
+    ok("p2 已移入回收站", Post.query.get(p2.id).deleted_at is not None)
+    ok("p3 已移入回收站", Post.query.get(p3.id).deleted_at is not None)
+
+    # 批量恢复
+    r = ca.post("/admin/posts/batch", data={**csrf(), "action": "restore",
+                                              "ids": [str(p2.id)]},
+                 follow_redirects=False)
+    ok("POST /admin/posts/batch action=restore -> 302", r.status_code == 302)
+    ok("p2 已恢复（deleted_at 为空）", Post.query.get(p2.id).deleted_at is None)
+    ok("p3 仍在回收站", Post.query.get(p3.id).deleted_at is not None)
+
+    # 单篇恢复
+    r = ca.post(f"/admin/posts/{p1.id}/restore", data=csrf(), follow_redirects=False)
+    ok("POST /admin/posts/<id>/restore -> 302", r.status_code == 302)
+    ok("p1 已恢复", Post.query.get(p1.id).deleted_at is None)
+
+    # 单篇永久删除
+    r = ca.post(f"/admin/posts/{p3.id}/purge", data=csrf(), follow_redirects=False)
+    ok("POST /admin/posts/<id>/purge -> 302", r.status_code == 302)
+    ok("p3 已物理删除", Post.query.get(p3.id) is None)
+
+    # 批量永久删除（对剩余 p2：先删除再批量 purge）
+    ca.post(f"/admin/posts/{p2.id}/delete", data=csrf())
+    r = ca.post("/admin/posts/batch", data={**csrf(), "action": "purge",
+                                              "ids": [str(p2.id)]},
+                 follow_redirects=False)
+    ok("POST /admin/posts/batch action=purge -> 302", r.status_code == 302)
+    ok("p2 已批量永久删除", Post.query.get(p2.id) is None)
+
+    # 过期清理函数（手动调用）：把 p1 再次移入回收站并改 deleted_at 到 31 天前
+    _p = Post.query.get(p1.id)
+    _p.deleted_at = datetime.now() - timedelta(days=31)
+    db.session.commit()
+    from utils import purge_expired_trash_posts
+    n = purge_expired_trash_posts(days=30)
+    ok("purge_expired_trash_posts(days=30) 清理了 1 篇过期文章", n >= 1)
+    ok("p1（31 天前删除）已被清理", Post.query.get(p1.id) is None)
+
+    # 批量工具栏 DOM 元素
+    _posts_html = ca.get("/admin/posts").get_data(as_text=True)
+    ok("/admin/posts 含 .batch-bar 工具栏容器", 'id="batchBar"' in _posts_html)
+    ok("/admin/posts 含 #batchAll 全选框", 'id="batchAll"' in _posts_html)
+    ok("/admin/posts 含每行 .rowCheck", 'class="rowCheck"' in _posts_html)
+    ok("/admin/posts 含 posts-batch.js",
+       "/static/js/posts-batch.js" in _posts_html)
+    ok("/admin/posts 含 wb-modal.js 引用（删除确认弹窗）",
+       "/static/js/wb-modal.js" in _posts_html)
 
 # --- 关键修复断言：DB 改 color_palette 后，所有后台页面首屏渲染就是新值 ---
 # 不再依赖进程级缓存：每个请求都从 DB 读最新值（之前的 cache 会在第一次请求后冻住）

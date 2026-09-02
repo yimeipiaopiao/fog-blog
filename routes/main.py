@@ -76,7 +76,8 @@ def inject_globals():
 
 
 def _published_posts():
-    return Post.query.filter_by(status="published")
+    """前台可见文章：已发布 + 未在回收站。"""
+    return Post.query.filter_by(status="published").filter(Post.deleted_at.is_(None))
 
 
 @main_bp.route("/")
@@ -104,7 +105,7 @@ def index():
 @main_bp.route("/post/<slug>")
 def post(slug):
     p = Post.query.filter_by(slug=slug).first_or_404()
-    if p.status != "published":
+    if p.status != "published" or p.deleted_at is not None:
         abort(404)
     # 浏览量 +1（session 去重，避免刷新刷量）
     viewed = session.setdefault("viewed_posts", [])

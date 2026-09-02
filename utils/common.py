@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import markdown
 from flask import abort, current_app, redirect, request, session, url_for
 
-from models import Log, Setting, User
+from models import Log, Post, Setting, User, db
 
 # ---------------- Markdown 渲染 ----------------
 
@@ -200,7 +200,7 @@ def purge_orphan_links():
 
 
 def maybe_maintenance():
-    """惰性维护：每 6 小时至多执行一次（日志清理 + 孤儿关联自愈，无需 cron）。"""
+    """惰性维护：每 6 小时至多执行一次（日志清理 + 孤儿关联自愈 + 回收站过期清理）。"""
     now = time.time()
     last = getattr(current_app, "_last_maintenance", 0)
     if now - last < 6 * 3600:
@@ -208,6 +208,20 @@ def maybe_maintenance():
     current_app._last_maintenance = now
     purge_old_logs()
     purge_orphan_links()
+    purge_expired_trash_posts()
+
+
+def purge_expired_trash_posts(days=30):
+    """清理回收站中超过 N 天的文章（物理删除）。返回删除数量。"""
+    cutoff = datetime.now() - timedelta(days=days)
+    expired = Post.query.filter(Post.deleted_at.isnot(None),
+                                 Post.deleted_at < cutoff).all()
+    n = len(expired)
+    for p in expired:
+        db.session.delete(p)
+    if n:
+        db.session.commit()
+    return n
 
 
 # ---------------- 分页 ----------------

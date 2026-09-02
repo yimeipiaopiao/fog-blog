@@ -37,23 +37,26 @@ def _inject():
 
 @admin_bp.route("/")
 def dashboard():
-    total_posts = Post.query.count()
-    published = Post.query.filter_by(status="published").count()
-    drafts = Post.query.filter_by(status="draft").count()
+    # 总数 / 概览：只统计未在回收站的文章（deleted_at IS NULL）
+    active_posts = Post.query.filter(Post.deleted_at.is_(None))
+    total_posts = active_posts.count()
+    published = active_posts.filter_by(status="published").count()
+    drafts = active_posts.filter_by(status="draft").count()
+    trash_count = Post.query.filter(Post.deleted_at.isnot(None)).count()
     total_views = db.session.query(db.func.coalesce(db.func.sum(Post.views), 0)).scalar()
     total_comments = Comment.query.count()
     pending_comments = Comment.query.filter_by(is_approved=False).count()
     total_categories = Category.query.count()
     total_tags = Tag.query.count()
 
-    recent_posts = Post.query.order_by(Post.created_at.desc()).limit(6).all()
+    recent_posts = active_posts.order_by(Post.created_at.desc()).limit(6).all()
     recent_comments = Comment.query.order_by(Comment.created_at.desc()).limit(6).all()
 
     # 近 7 天发布数量
     week_ago = (datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
                 - timedelta(days=6))
     posts_week = (
-        Post.query.filter(Post.created_at >= week_ago).count()
+        active_posts.filter(Post.created_at >= week_ago).count()
     )
     comments_week = (
         Comment.query.filter(Comment.created_at >= week_ago).count()
@@ -118,14 +121,17 @@ def _parse_publish_time(value):
 def posts():
     status = request.args.get("status", "")
     sort = request.args.get("sort", "time_desc")
+    view = request.args.get("view", "active")  # active | trash
     q = Post.query
+    if view == "trash":
+        q = q.filter(Post.deleted_at.isnot(None))
+    else:
+        q = q.filter(Post.deleted_at.is_(None))
     if status in ("draft", "published", "scheduled"):
         q = q.filter_by(status=status)
     if sort == "time_asc":
         q = q.order_by(Post.published_at.asc(), Post.id.asc())
     elif sort == "hot":
-        # 热度 = 互动加权（点赞×5 + 评论×10）+ 阅读兜底，同分新文在前。
-        # comment_count 是 Python property（非列），用关联子查询参与 SQL 排序
         _cmt = (
             select(func.count(Comment.id))
             .where(Comment.post_id == Post.id, Comment.is_approved.is_(True))
@@ -137,7 +143,18 @@ def posts():
     else:
         q = q.order_by(Post.published_at.desc(), Post.id.desc())
     posts = q.all()
-    return render_template("admin/posts.html", posts=posts, status=status, sort=sort)
+    return render_template("admin/posts.html", posts=posts, status=status, sort=sort, view=view)
+
+
+@admin_bp.route("/posts/trash")
+def posts_trash():
+    """回收站视图 —— 显示 30 天内可恢复的已删除文章。"""
+    posts = (
+        Post.query.filter(Post.deleted_at.isnot(None))
+        .order_by(Post.deleted_at.desc())
+        .all()
+    )
+    return render_template("admin/posts.html", posts=posts, status="", sort="time_desc", view="trash")
 
 
 @admin_bp.route("/posts/new", methods=["GET", "POST"])
@@ -213,12 +230,90 @@ def _save_post(pid):
 
 @admin_bp.route("/posts/<int:pid>/delete", methods=["POST"])
 def post_delete(pid):
+    """软删除：放入回收站（30 天后自动物理删除）。"""
     post = Post.query.get_or_404(pid)
+    post.deleted_at = datetime.now()
+    db.session.commit()
+    write_log("post_trash", f"移入回收站：{post.title}", "", username=session_user())
+    flash("文章已移入回收站，30 天后自动删除", "success")
+    return redirect(url_for("admin.posts"))
+
+
+@admin_bp.route("/posts/<int:pid>/restore", methods=["POST"])
+def post_restore(pid):
+    """从回收站恢复。"""
+    post = Post.query.get_or_404(pid)
+    post.deleted_at = None
+    db.session.commit()
+    write_log("post_restore", f"恢复文章：{post.title}", "", username=session_user())
+    flash("文章已恢复", "success")
+    return redirect(url_for("admin.posts_trash"))
+
+
+@admin_bp.route("/posts/<int:pid>/purge", methods=["POST"])
+def post_purge(pid):
+    """物理删除回收站中的文章（立即清空，不可恢复）。"""
+    post = Post.query.get_or_404(pid)
+    title = post.title
     db.session.delete(post)
     db.session.commit()
-    write_log("post_delete", f"删除文章：{post.title}", "", username=session_user())
-    flash("文章已删除", "success")
+    write_log("post_purge", f"永久删除：{title}", "", username=session_user())
+    flash("文章已永久删除", "success")
+    return redirect(url_for("admin.posts_trash"))
+
+
+@admin_bp.route("/posts/batch", methods=["POST"])
+def posts_batch():
+    """批量操作：action=delete 软删除（移入回收站）；action=purge 永久删除（仅回收站中）。"""
+    action = request.form.get("action", "")
+    ids = request.form.getlist("ids")
+    if not ids:
+        flash("请先勾选文章", "error")
+        return redirect(request.referrer or url_for("admin.posts"))
+    try:
+        id_list = [int(x) for x in ids if x.isdigit()]
+    except (TypeError, ValueError):
+        flash("无效的文章 ID", "error")
+        return redirect(request.referrer or url_for("admin.posts"))
+    if not id_list:
+        flash("请先勾选文章", "error")
+        return redirect(request.referrer or url_for("admin.posts"))
+    objs = Post.query.filter(Post.id.in_(id_list)).all()
+    if action == "delete":
+        for p in objs:
+            if p.deleted_at is None:
+                p.deleted_at = datetime.now()
+        db.session.commit()
+        write_log("posts_batch_trash", f"批量移入回收站 {len(objs)} 篇", "", username=session_user())
+        flash(f"已将 {len(objs)} 篇文章移入回收站", "success")
+        return redirect(url_for("admin.posts"))
+    if action == "purge":
+        for p in objs:
+            db.session.delete(p)
+        db.session.commit()
+        write_log("posts_batch_purge", f"批量永久删除 {len(objs)} 篇", "", username=session_user())
+        flash(f"已永久删除 {len(objs)} 篇文章", "success")
+        return redirect(url_for("admin.posts_trash"))
+    if action == "restore":
+        for p in objs:
+            p.deleted_at = None
+        db.session.commit()
+        write_log("posts_batch_restore", f"批量恢复 {len(objs)} 篇", "", username=session_user())
+        flash(f"已恢复 {len(objs)} 篇文章", "success")
+        return redirect(url_for("admin.posts_trash"))
+    flash(f"未知的批量操作：{action}", "error")
     return redirect(url_for("admin.posts"))
+
+
+@admin_bp.route("/posts/auto-purge-expired", methods=["POST"])
+def posts_auto_purge_expired():
+    """手动触发：清理 30 天前回收站中的文章（也作为管理入口）。
+    真实清理任务在应用启动时已自动跑一次（见 utils.cleanup_expired_posts）。
+    """
+    from utils import purge_expired_trash_posts
+    n = purge_expired_trash_posts()
+    flash(f"已清理 {n} 篇过期文章（超过 30 天）", "success")
+    return redirect(url_for("admin.posts_trash"))
 
 
 # ---------------- PDF 转文章 ----------------

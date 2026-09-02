@@ -1,53 +1,8 @@
 /* ============================================================
- *  后台主题切换控件（v7 → v8）
- *  - 顶部横条已移除，改用左侧栏底部的 `.prefs-dock` 紧凑双按钮
- *  - 与前台共用同一份 JS（theme.js / widgets.js），双向同步 + 多标签同步
- *  - 样式只负责"后台左侧栏底部紧凑版"的差异
+ *  配色选择器 + 配色色板 —— 前台 base.html 配色切换控件
+ *  (后台不再提供切换入口，仅由站点设置页 / 前台切换)
  * ============================================================ */
 
-/* 左侧底部：紧凑的双按钮 + 配色弹层 */
-.prefs-dock {
-  position: sticky;
-  bottom: -18px;            /* 抵消 .aside 的 padding-bottom */
-  margin: auto -14px -18px; /* 推到 sidebar 内边缘 */
-  padding: 10px 14px;
-  display: flex; align-items: center; gap: 8px;
-  border-top: 1px solid var(--glass-border, rgba(255, 250, 240, 0.7));
-  background: var(--glass-bg-soft, rgba(255, 252, 246, 0.85));
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  z-index: 5;
-}
-
-.prefs-dock .theme-toggle,
-.prefs-dock .palette-toggle {
-  width: 34px; height: 34px;
-  border: 1px solid var(--glass-border, rgba(255, 250, 240, 0.7));
-  border-radius: 9px;
-  background: var(--glass-bg, rgba(255, 252, 246, 0.55));
-  color: var(--text-2, #6d5d47);
-  display: inline-flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: all 0.15s;
-  padding: 0;
-}
-.prefs-dock .theme-toggle:hover,
-.prefs-dock .palette-toggle:hover {
-  background: rgba(var(--primary-rgb, 180, 83, 9), 0.12);
-  color: var(--primary, #b45309);
-}
-.prefs-dock .theme-toggle .ic-moon { display: none; }
-.prefs-dock .theme-toggle .ic-auto { display: none; }
-.prefs-dock .theme-toggle[data-mode="dark"] .ic-sun { display: none; }
-.prefs-dock .theme-toggle[data-mode="dark"] .ic-moon { display: inline-block; }
-.prefs-dock .theme-toggle[data-mode="auto"] .ic-sun { display: none; }
-.prefs-dock .theme-toggle[data-mode="auto"] .ic-auto { display: inline-block; }
-
-/* 配色弹层：从左侧靠右弹出（因为 dock 在左侧） */
-.prefs-dock .palette-wrap { position: relative; }
-.prefs-dock .palette-picker {
-  position: absolute; left: calc(100% + 8px); bottom: 0;
-  width: 220px; padding: 12px; border-radius: 12px; z-index: 50;
-}
 .palette-picker-title {
   font-size: 12px; color: var(--text-3, #a38d72);
   margin-bottom: 8px; padding: 2px 4px;
@@ -70,7 +25,7 @@
 }
 .palette-options .sw {
   width: 16px; height: 16px; border-radius: 50%;
-  flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+  flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 .sw-amber { background: linear-gradient(135deg, #b45309, #d97706); }
 .sw-sea   { background: linear-gradient(135deg, #0e7490, #0891b2); }
@@ -85,13 +40,3 @@
   background: transparent; color: var(--text-3, #a38d72);
 }
 .palette-reset:hover { color: var(--primary, #b45309); }
-
-@media (max-width: 720px) {
-  .prefs-dock .palette-picker { left: auto; right: 0; bottom: calc(100% + 6px); }
-}
-
-/* 深色模式：补足 dock 按钮颜色对比 */
-html[data-theme="dark"] .prefs-dock .theme-toggle,
-html[data-theme="dark"] .prefs-dock .palette-toggle {
-  color: #e7d8c3;
-}
