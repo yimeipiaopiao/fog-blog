@@ -23,8 +23,8 @@ Restart=always
 RestartSec=5
 LimitNOFILE=65535
 
-# 安全的加固选项
-NoNewPrivileges=true
+# 安全的加固选项（注意：NoNewPrivileges=true 会阻止 sudo setuid to root，
+# 导致 SSL 上传 wrapper（blog-ssl-apply）失败。保留其他加固项即可）
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
