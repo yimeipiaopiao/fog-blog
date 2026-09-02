@@ -32,6 +32,9 @@ cdp_profile_*/
 cdp_measure_*/
 cdp_pdf_*/
 cdp_*/
+.edge-*/
+# Node 模块（cdp_shot_v*.js 用到的 ws 仅在截图时临时装在项目目录）
+node_modules/
 
 # OS
 .DS_Store
